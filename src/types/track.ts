@@ -1,15 +1,54 @@
-export interface Track {
-  id: string
-  created_at: string
-  title: string
-  publisher: string | null
-  fee: number | null
-  due_date: string | null
-  status: string
-  invoice_status: string
-  project_code: string | null
-  folder_name: string | null
-  notes: string | null
-  source_url: string | null
-  brief_parsed_at: string | null
-}
+export type StatusId =
+  | 'brief'
+  | 'writing'
+  | 'written'
+  | 'revising'
+  | 'needs_rev'
+  | 'sent'
+  | 'approved'
+  | 'delivered'
+  | 'hold'
+  | 'rejected';
+
+export type InvoiceStatus = 'unpaid' | 'invoiced' | 'paid';
+
+export type ActivityEventKind =
+  | 'created'
+  | 'status_change'
+  | 'email_matched'
+  | 'invoice_change'
+  | 'note';
+
+export type ActivityEvent = {
+  at: string;
+  kind: ActivityEventKind;
+  from?: string;
+  to?: string;
+  source?: 'user' | 'email' | 'ai';
+  detail?: string;
+};
+
+export type Track = {
+  id: string;
+  created_at: string;
+  code: string | null;
+  title: string;
+  album: string | null;
+  version: string;
+  status: StatusId;
+  invoice: InvoiceStatus;
+  due_date: string | null;
+  publisher: string | null;
+  publisher_email: string | null;
+  fee: number | null;
+  brief_link: string | null;
+  folder_path: string | null;
+  brief_parsed_at: string | null;
+  collaborators: string[];
+  notes: string | null;
+  activity: ActivityEvent[];
+};
+
+export type NewTrack = Omit<Track, 'id' | 'created_at' | 'activity'> & {
+  activity?: ActivityEvent[];
+};
