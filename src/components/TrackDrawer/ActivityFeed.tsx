@@ -1,4 +1,5 @@
 // src/components/TrackDrawer/ActivityFeed.tsx
+import type { ReactNode } from 'react';
 import { THEME, statusById } from '../../lib/theme';
 import type { ActivityEvent } from '../../types/track';
 
@@ -22,7 +23,7 @@ function dotColor(event: ActivityEvent): string {
   }
 }
 
-function describeEvent(event: ActivityEvent): React.ReactNode {
+function describeEvent(event: ActivityEvent): ReactNode {
   switch (event.kind) {
     case 'status_change':
       return <>Status → <strong>{statusById(event.to ?? '').label}</strong></>;
@@ -70,7 +71,7 @@ export function ActivityFeed({ events }: Props) {
       {sorted.map((event, i) => {
         const isLast = i === sorted.length - 1;
         return (
-          <div key={i} style={{ display: 'flex', gap: 9, marginBottom: 8, alignItems: 'flex-start' }}>
+          <div key={`${event.at}-${event.kind}`} style={{ display: 'flex', gap: 9, marginBottom: 8, alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4 }}>
               <div style={{
                 width: 7, height: 7, borderRadius: '50%',
