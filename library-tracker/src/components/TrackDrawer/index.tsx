@@ -12,6 +12,103 @@ type Props = {
   onSave: (updated: Track) => void;
 };
 
+function parseComposers(collaborators: string[]) {
+  return collaborators.map((c) => {
+    const [initials, pct] = c.split(':');
+    return { initials, pct: pct ?? '' };
+  });
+}
+
+function serializeComposers(rows: { initials: string; pct: string }[]): string[] {
+  return rows
+    .filter((r) => r.initials.trim())
+    .map((r) => r.pct.trim() ? `${r.initials.trim()}:${r.pct.trim()}` : r.initials.trim());
+}
+
+function ComposerSplits({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const rows = parseComposers(value.length ? value : []);
+  const total = rows.reduce((sum, r) => sum + (Number(r.pct) || 0), 0);
+  const totalOk = total === 100;
+
+  function updateRow(idx: number, field: 'initials' | 'pct', val: string) {
+    const next = rows.map((r, i) => i === idx ? { ...r, [field]: val } : r);
+    onChange(serializeComposers(next));
+  }
+
+  function addRow() {
+    onChange(serializeComposers([...rows, { initials: '', pct: '' }]));
+  }
+
+  function removeRow(idx: number) {
+    onChange(serializeComposers(rows.filter((_, i) => i !== idx)));
+  }
+
+  const FIELD: CSSProperties = {
+    background: THEME.surfaceAlt,
+    border: `1px solid ${THEME.border}`,
+    borderRadius: 4,
+    padding: '5px 7px',
+    fontSize: 12.5,
+    color: THEME.ink,
+    fontFamily: THEME.sans,
+    outline: 'none',
+  };
+
+  return (
+    <div>
+      {rows.map((row, idx) => (
+        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <input
+            value={row.initials}
+            onChange={(e) => updateRow(idx, 'initials', e.target.value.toUpperCase())}
+            placeholder="LL"
+            maxLength={4}
+            style={{ ...FIELD, width: 52, fontFamily: THEME.mono, textAlign: 'center', fontWeight: 600 }}
+          />
+          <input
+            value={row.pct}
+            onChange={(e) => updateRow(idx, 'pct', e.target.value)}
+            placeholder="%"
+            type="number"
+            min={0}
+            max={100}
+            style={{ ...FIELD, width: 60, fontFamily: THEME.mono, textAlign: 'right' }}
+          />
+          <span style={{ fontSize: 12, color: THEME.inkMuted }}>%</span>
+          <button
+            onClick={() => removeRow(idx)}
+            style={{
+              background: 'none', border: `1px solid ${THEME.border}`,
+              borderRadius: 4, width: 22, height: 22,
+              color: THEME.inkMuted, fontSize: 14, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, lineHeight: 1,
+            }}
+          >×</button>
+        </div>
+      ))}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+        <button
+          onClick={addRow}
+          style={{
+            background: 'none', border: 'none', padding: 0,
+            fontSize: 12, color: THEME.accent, cursor: 'pointer',
+            fontFamily: THEME.sans, fontWeight: 500,
+          }}
+        >+ Add composer</button>
+        {rows.length > 0 && (
+          <span style={{
+            fontSize: 11, fontFamily: THEME.mono, fontWeight: 600,
+            color: totalOk ? '#2e7d52' : total > 100 ? '#c44545' : THEME.inkMuted,
+          }}>
+            = {total}%
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const INPUT_STYLE: CSSProperties = {
   width: '100%',
   background: THEME.surfaceAlt,
@@ -226,16 +323,11 @@ export function TrackDrawer({ track, onClose, onSave }: Props) {
             </DrawerField>
           </div>
 
-          {/* Collaborators */}
-          <DrawerField label="Collaborators">
-            <input
-              type="text"
-              value={draft.collaborators.join(', ')}
-              onChange={(e) =>
-                set('collaborators', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
-              }
-              placeholder="LL, MK"
-              style={INPUT_STYLE}
+          {/* Composers & Splits */}
+          <DrawerField label="Composers & Splits">
+            <ComposerSplits
+              value={draft.collaborators}
+              onChange={(v) => set('collaborators', v)}
             />
           </DrawerField>
 

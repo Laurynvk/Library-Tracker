@@ -16,9 +16,124 @@ type Props = {
   tracks: Track[];
   onUpdateInvoice: (id: string, invoice: InvoiceStatus) => void;
   onUpdateTitle: (id: string, title: string) => void;
+  onUpdateVersion: (id: string, version: string) => void;
+  onUpdateCode: (id: string, code: string | null) => void;
   onRowClick: (track: Track) => void;
   selectedTrackId?: string;
 };
+
+function EditableCode({ value, onCommit }: { value: string | null; onCommit: (v: string | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? '');
+
+  function commit() {
+    const trimmed = draft.trim();
+    const next = trimmed || null;
+    if (next !== value) onCommit(next);
+    setEditing(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          fontSize: 11.5, fontFamily: THEME.mono, color: THEME.ink,
+          background: THEME.surfaceAlt,
+          border: `1px solid ${THEME.accent}`,
+          borderRadius: 4,
+          padding: '2px 6px',
+          width: '100%',
+          outline: 'none',
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); setDraft(value ?? ''); setEditing(true); }}
+      title="Click to edit project code"
+      style={{
+        fontFamily: THEME.mono, fontSize: 11.5,
+        color: value ? THEME.ink : THEME.inkMuted,
+        fontStyle: value ? 'normal' : 'italic',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block',
+        cursor: 'text',
+      }}
+    >
+      {value ?? 'Add code'}
+    </span>
+  );
+}
+
+function EditableVersion({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (trimmed !== value) onCommit(trimmed);
+    setEditing(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          fontSize: 11.5, fontFamily: THEME.mono, color: THEME.ink,
+          background: THEME.surfaceAlt,
+          border: `1px solid ${THEME.accent}`,
+          borderRadius: 4,
+          padding: '2px 5px',
+          width: 68,
+          outline: 'none',
+        }}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); setDraft(value); setEditing(true); }}
+      title="Click to edit version"
+      style={{
+        fontSize: 11.5, fontFamily: THEME.mono,
+        color: THEME.inkSoft,
+        background: THEME.surfaceAlt,
+        border: `1px solid ${THEME.border}`,
+        borderRadius: 4,
+        padding: '2px 6px',
+        cursor: 'text',
+        whiteSpace: 'nowrap',
+        display: 'inline-block',
+      }}
+    >
+      {value || 'v1.00'}
+    </span>
+  );
+}
 
 function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -83,15 +198,31 @@ function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: strin
   );
 }
 
+function parseSplits(collaborators: string[]): { initials: string; pct: number | null }[] {
+  return collaborators.map((c) => {
+    const [initials, pct] = c.split(':');
+    return { initials, pct: pct != null ? Number(pct) : null };
+  });
+}
+
+function formatSplitsInline(collaborators: string[]): string {
+  if (!collaborators.length) return '—';
+  return parseSplits(collaborators)
+    .map(({ initials, pct }) => pct != null ? `${initials} ${pct}%` : initials)
+    .join(' / ');
+}
+
 const col = createColumnHelper<Track>();
 
+// Column order: Code > Title > Version > Album > Publisher > Status > Due > Fee > Invoice > Splits
 const columns = [
   col.accessor('code', {
     header: 'Project Code',
     cell: (i) => (
-      <span style={{ fontFamily: THEME.mono, fontSize: 11.5, color: THEME.ink, whiteSpace: 'nowrap' }}>
-        {i.getValue() ?? '—'}
-      </span>
+      <EditableCode
+        value={i.getValue()}
+        onCommit={(code) => i.table.options.meta?.onUpdateCode(i.row.original.id, code)}
+      />
     ),
   }),
   col.accessor('title', {
@@ -103,8 +234,26 @@ const columns = [
       />
     ),
   }),
+  col.accessor('version', {
+    header: 'Version',
+    cell: (i) => (
+      <EditableVersion
+        value={i.getValue() || 'v1.00'}
+        onCommit={(version) => i.table.options.meta?.onUpdateVersion(i.row.original.id, version)}
+      />
+    ),
+    enableSorting: false,
+  }),
   col.accessor('album', {
     header: 'Album',
+    cell: (i) => (
+      <span style={{ fontSize: 12.5, color: THEME.inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+        {i.getValue() ?? '—'}
+      </span>
+    ),
+  }),
+  col.accessor('publisher', {
+    header: 'Publisher',
     cell: (i) => (
       <span style={{ fontSize: 12.5, color: THEME.inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
         {i.getValue() ?? '—'}
@@ -116,11 +265,11 @@ const columns = [
     cell: (i) => <StatusPill statusId={i.getValue()} />,
     enableSorting: false,
   }),
-  col.accessor('publisher', {
-    header: 'Publisher',
+  col.accessor('due_date', {
+    header: 'Due',
     cell: (i) => (
-      <span style={{ fontSize: 12.5, color: THEME.inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-        {i.getValue() ?? '—'}
+      <span style={{ fontSize: 12.5, color: THEME.inkSoft, fontVariantNumeric: 'tabular-nums' }}>
+        {fmtDate(i.getValue())}
       </span>
     ),
   }),
@@ -142,25 +291,32 @@ const columns = [
     ),
     enableSorting: false,
   }),
-  col.accessor('due_date', {
-    header: 'Due',
+  col.accessor('collaborators', {
+    header: 'Splits',
     cell: (i) => (
-      <span style={{ fontSize: 12.5, color: THEME.inkSoft, fontVariantNumeric: 'tabular-nums' }}>
-        {fmtDate(i.getValue())}
+      <span style={{
+        fontSize: 12, color: THEME.inkSoft,
+        fontFamily: THEME.mono,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block',
+      }}>
+        {formatSplitsInline(i.getValue())}
       </span>
     ),
+    enableSorting: false,
   }),
 ];
 
 const COL_WIDTHS: Record<string, string> = {
-  code:      '0 0 280px',
-  title:     '1 1 140px',
-  album:     '0 0 140px',
-  status:    '0 0 140px',
-  publisher: '0 0 160px',
-  fee:       '0 0 80px',
-  invoice:   '0 0 96px',
-  due_date:  '0 0 80px',
+  code:          '0 0 220px',
+  title:         '1 1 140px',
+  version:       '0 0 76px',
+  album:         '0 0 120px',
+  publisher:     '0 0 140px',
+  status:        '0 0 130px',
+  due_date:      '0 0 72px',
+  fee:           '0 0 76px',
+  invoice:       '0 0 90px',
+  collaborators: '0 0 150px',
 };
 
 declare module '@tanstack/react-table' {
@@ -168,10 +324,12 @@ declare module '@tanstack/react-table' {
   interface TableMeta<TData> {
     onUpdateInvoice: (id: string, invoice: InvoiceStatus) => void;
     onUpdateTitle: (id: string, title: string) => void;
+    onUpdateVersion: (id: string, version: string) => void;
+    onUpdateCode: (id: string, code: string | null) => void;
   }
 }
 
-export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onRowClick, selectedTrackId }: Props) {
+export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
 
   const table = useReactTable({
@@ -181,7 +339,7 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onRowClick,
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    meta: { onUpdateInvoice, onUpdateTitle },
+    meta: { onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode },
   });
 
   const ROW_PAD = '0 18px';
@@ -244,7 +402,7 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onRowClick,
           {row.getVisibleCells().map((cell) => (
             <div
               key={cell.id}
-              onClick={cell.column.id === 'title' ? (e) => e.stopPropagation() : undefined}
+              onClick={(['title', 'version', 'code'] as string[]).includes(cell.column.id) ? (e) => e.stopPropagation() : undefined}
               style={{
                 flex: COL_WIDTHS[cell.column.id] ?? '1 1 100px',
                 paddingRight: 12,

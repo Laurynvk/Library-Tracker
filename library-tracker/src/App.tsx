@@ -7,6 +7,13 @@ import { TrackDrawer } from './components/TrackDrawer';
 import { THEME } from './lib/theme';
 import type { Track, InvoiceStatus } from './types/track';
 
+function bumpVersion(v: string): string {
+  const match = v.match(/^v(\d+)\.(\d+)$/);
+  if (!match) return v;
+  const minor = parseInt(match[2], 10) + 1;
+  return `v${match[1]}.${String(minor).padStart(2, '0')}`;
+}
+
 export default function App() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -39,8 +46,26 @@ export default function App() {
   }
 
   function handleSaveTrack(updated: Track) {
-    setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-    setSelectedTrack(updated);
+    setTracks((prev) => prev.map((t) => {
+      if (t.id !== updated.id) return t;
+      // auto-bump version when status moves to 'revising'
+      if (updated.status === 'revising' && t.status !== 'revising') {
+        const newVersion = bumpVersion(updated.version || 'v1.00');
+        updateTrack(updated.id, { version: newVersion }).catch((e) => setError(e.message));
+        return { ...updated, version: newVersion };
+      }
+      return updated;
+    }));
+    setSelectedTrack((prev) => {
+      if (prev?.id !== updated.id) return prev;
+      if (updated.status === 'revising') {
+        const existing = tracks.find((t) => t.id === updated.id);
+        if (existing && existing.status !== 'revising') {
+          return { ...updated, version: bumpVersion(updated.version || 'v1.00') };
+        }
+      }
+      return updated;
+    });
   }
 
   async function handleUpdateInvoice(id: string, invoice: InvoiceStatus) {
@@ -59,6 +84,26 @@ export default function App() {
     setSelectedTrack((prev) => (prev?.id === id ? { ...prev, title } : prev));
     try {
       await updateTrack(id, { title });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function handleUpdateCode(id: string, code: string | null) {
+    setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, code } : t)));
+    setSelectedTrack((prev) => (prev?.id === id ? { ...prev, code } : prev));
+    try {
+      await updateTrack(id, { code });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function handleUpdateVersion(id: string, version: string) {
+    setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, version } : t)));
+    setSelectedTrack((prev) => (prev?.id === id ? { ...prev, version } : prev));
+    try {
+      await updateTrack(id, { version });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -94,6 +139,8 @@ export default function App() {
         tracks={filtered}
         onUpdateInvoice={handleUpdateInvoice}
         onUpdateTitle={handleUpdateTitle}
+        onUpdateVersion={handleUpdateVersion}
+        onUpdateCode={handleUpdateCode}
         onRowClick={handleSelectTrack}
         selectedTrackId={selectedTrack?.id}
       />
