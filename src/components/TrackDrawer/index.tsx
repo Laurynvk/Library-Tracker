@@ -44,14 +44,17 @@ export function TrackDrawer({ track, onClose, onSave }: Props) {
 
   async function handleSave() {
     if (!draft || !track) return;
+    const IMMUTABLE: (keyof Track)[] = ['id', 'created_at', 'activity'];
     const patch: Partial<Track> = {};
-    (Object.keys(draft) as (keyof Track)[]).forEach((k) => {
-      const a = draft[k];
-      const b = track[k];
-      if (JSON.stringify(a) !== JSON.stringify(b)) {
-        (patch as Record<string, unknown>)[k] = a;
-      }
-    });
+    (Object.keys(draft) as (keyof Track)[])
+      .filter((k) => !IMMUTABLE.includes(k))
+      .forEach((k) => {
+        const a = draft[k];
+        const b = track[k];
+        if (JSON.stringify(a) !== JSON.stringify(b)) {
+          (patch as Record<string, unknown>)[k] = a;
+        }
+      });
     setSaving(true);
     setError(null);
     try {
