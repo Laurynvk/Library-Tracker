@@ -1,0 +1,3027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lauryn's Library Tracker</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; font-family: "Inter Tight", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  /* nice scrollbars in artboards */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<!-- React + Babel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- inlined modules (avoids 401 on .jsx fetches) -->
+<script type="text/babel" data-presets="react" data-label="design-canvas">
+
+// DesignCanvas.jsx — Figma-ish design canvas wrapper
+// Warm gray grid bg + Sections + Artboards + PostIt notes.
+// Artboards are reorderable (grip-drag), deletable, labels/titles are
+// inline-editable, and any artboard can be opened in a fullscreen focus
+// overlay (←/→/Esc). State persists to a .design-canvas.state.json sidecar
+// via the host bridge. No assets, no deps.
+//
+// Usage:
+//   <DesignCanvas>
+//     <DCSection id="onboarding" title="Onboarding" subtitle="First-run variants">
+//       <DCArtboard id="a" label="A · Dusk" width={260} height={480}>…</DCArtboard>
+//       <DCArtboard id="b" label="B · Minimal" width={260} height={480}>…</DCArtboard>
+//     </DCSection>
+//   </DesignCanvas>
+
+const DC = {
+  bg: '#f0eee9',
+  grid: 'rgba(0,0,0,0.06)',
+  label: 'rgba(60,50,40,0.7)',
+  title: 'rgba(40,30,20,0.85)',
+  subtitle: 'rgba(60,50,40,0.6)',
+  postitBg: '#fef4a8',
+  postitText: '#5a4a2a',
+  font: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+};
+
+// One-time CSS injection (classes are dc-prefixed so they don't collide with
+// the hosted design's own styles).
+if (typeof document !== 'undefined' && !document.getElementById('dc-styles')) {
+  const s = document.createElement('style');
+  s.id = 'dc-styles';
+  s.textContent = [
+    '.dc-editable{cursor:text;outline:none;white-space:nowrap;border-radius:3px;padding:0 2px;margin:0 -2px}',
+    '.dc-editable:focus{background:#fff;box-shadow:0 0 0 1.5px #c96442}',
+    '[data-dc-slot]{transition:transform .18s cubic-bezier(.2,.7,.3,1)}',
+    '[data-dc-slot].dc-dragging{transition:none;z-index:10;pointer-events:none}',
+    '[data-dc-slot].dc-dragging .dc-card{box-shadow:0 12px 40px rgba(0,0,0,.25),0 0 0 2px #c96442;transform:scale(1.02)}',
+    // isolation:isolate contains artboard content's z-indexes so a
+    // z-indexed child (sticky navbar etc.) can't paint over .dc-header or
+    // the .dc-menu popover that drops into the top of the card.
+    '.dc-card{isolation:isolate;transition:box-shadow .15s,transform .15s}',
+    '.dc-card *{scrollbar-width:none}',
+    '.dc-card *::-webkit-scrollbar{display:none}',
+    // Per-artboard header: grip + label on the left, delete/expand on the
+    // right. Single flex row; when the artboard's on-screen width is too
+    // narrow for both the label yields (ellipsis, then hidden entirely below
+    // ~4ch via the container query) and the buttons stay on the row.
+    '.dc-header{position:absolute;bottom:100%;left:-4px;margin-bottom:calc(4px * var(--dc-inv-zoom,1));z-index:2;',
+    '  display:flex;align-items:center;container-type:inline-size}',
+    '.dc-labelrow{display:flex;align-items:center;gap:4px;height:24px;flex:1 1 auto;min-width:0}',
+    '.dc-grip{flex:0 0 auto;cursor:grab;display:flex;align-items:center;padding:5px 4px;border-radius:4px;transition:background .12s,opacity .12s}',
+    '.dc-grip:hover{background:rgba(0,0,0,.08)}',
+    '.dc-grip:active{cursor:grabbing}',
+    '.dc-labeltext{flex:1 1 auto;min-width:0;cursor:pointer;border-radius:4px;padding:3px 6px;',
+    '  display:flex;align-items:center;transition:background .12s;overflow:hidden}',
+    // Below ~4ch of label room: hide the label entirely, and drop the grip to
+    // hover-only (same reveal rule as .dc-btns) so a narrow header is clean
+    // until the card is moused.
+    '@container (max-width: 110px){',
+    '  .dc-labeltext{display:none}',
+    '  .dc-grip{opacity:0}',
+    '  [data-dc-slot]:hover .dc-grip{opacity:1}',
+    '}',
+    '.dc-labeltext:hover{background:rgba(0,0,0,.05)}',
+    '.dc-labeltext .dc-editable{overflow:hidden;text-overflow:ellipsis;max-width:100%}',
+    '.dc-labeltext .dc-editable:focus{overflow:visible;text-overflow:clip}',
+    '.dc-btns{flex:0 0 auto;margin-left:auto;display:flex;gap:2px;opacity:0;transition:opacity .12s}',
+    '[data-dc-slot]:hover .dc-btns,.dc-btns:has(.dc-menu){opacity:1}',
+    '.dc-expand,.dc-kebab{width:22px;height:22px;border-radius:5px;border:none;cursor:pointer;padding:0;',
+    '  background:transparent;color:rgba(60,50,40,.7);display:flex;align-items:center;justify-content:center;',
+    '  font:inherit;transition:background .12s,color .12s}',
+    '.dc-expand:hover,.dc-kebab:hover{background:rgba(0,0,0,.06);color:#2a251f}',
+    // Slot hosting an open menu floats above later siblings (which otherwise
+    // paint on top — same z-index:auto, later DOM order) so the popup isn't
+    // clipped by the next card.
+    '[data-dc-slot]:has(.dc-menu){z-index:10}',
+    '.dc-menu{position:absolute;top:100%;right:0;margin-top:4px;background:#fff;border-radius:8px;',
+    '  box-shadow:0 8px 28px rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.05);padding:4px;min-width:160px;z-index:10}',
+    '.dc-menu button{display:block;width:100%;padding:7px 10px;border:0;background:transparent;',
+    '  border-radius:5px;font-family:inherit;font-size:13px;font-weight:500;line-height:1.2;',
+    '  color:#29261b;cursor:pointer;text-align:left;transition:background .12s;white-space:nowrap}',
+    '.dc-menu button:hover{background:rgba(0,0,0,.05)}',
+    '.dc-menu hr{border:0;border-top:1px solid rgba(0,0,0,.08);margin:4px 2px}',
+    '.dc-menu .dc-danger{color:#c96442}',
+    '.dc-menu .dc-danger:hover{background:rgba(201,100,66,.1)}',
+    // Chrome (titles / labels / buttons) counter-scales against the viewport
+    // zoom so it stays a constant on-screen size. --dc-inv-zoom is set by
+    // DCViewport on every transform update and inherits to all descendants —
+    // any overlay inside the world (e.g. a TweaksPanel on an artboard) can use
+    // it the same way.
+    //
+    // The header uses transform:scale (out-of-flow, so layout impact doesn't
+    // matter) with its world-space width set to card-width / inv-zoom so that
+    // after counter-scaling its on-screen width exactly matches the card's —
+    // that's what lets the container query + text-overflow behave against the
+    // card's visible edge at every zoom level.
+    //
+    // The section head uses CSS zoom instead of transform so its layout box
+    // grows with the counter-scale, pushing the card row down — otherwise the
+    // constant-screen-size title would overflow into the (shrinking) world-
+    // space gap and overlap the artboard headers at low zoom.
+    '.dc-header{width:calc((100% + 4px) / var(--dc-inv-zoom,1));',
+    '  transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom left}',
+    '.dc-sectionhead{zoom:var(--dc-inv-zoom,1)}',
+  ].join('\n');
+  document.head.appendChild(s);
+}
+
+const DCCtx = React.createContext(null);
+
+// ─────────────────────────────────────────────────────────────
+// DesignCanvas — stateful wrapper around the pan/zoom viewport.
+// Owns runtime state (per-section order, renamed titles/labels, hidden
+// artboards, focused artboard). Order/titles/labels/hidden persist to a
+// .design-canvas.state.json
+// sidecar next to the HTML. Reads go via plain fetch() so the saved
+// arrangement is visible anywhere the HTML + sidecar are served together
+// (omelette preview, direct link, downloaded zip). Writes go through the
+// host's window.omelette bridge — editing requires the omelette runtime.
+// Focus is ephemeral.
+// ─────────────────────────────────────────────────────────────
+const DC_STATE_FILE = '.design-canvas.state.json';
+
+function DesignCanvas({ children, minScale, maxScale, style }) {
+  const [state, setState] = React.useState({ sections: {}, focus: null });
+  // Hold rendering until the sidecar read settles so the saved order/titles
+  // appear on first paint (no source-order flash). didRead gates writes until
+  // the read settles so the empty initial state can't clobber a slow read;
+  // skipNextWrite suppresses the one echo-write that would otherwise follow
+  // hydration.
+  const [ready, setReady] = React.useState(false);
+  const didRead = React.useRef(false);
+  const skipNextWrite = React.useRef(false);
+
+  React.useEffect(() => {
+    let off = false;
+    fetch('./' + DC_STATE_FILE)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((saved) => {
+        if (off || !saved || !saved.sections) return;
+        skipNextWrite.current = true;
+        setState((s) => ({ ...s, sections: saved.sections }));
+      })
+      .catch(() => {})
+      .finally(() => { didRead.current = true; if (!off) setReady(true); });
+    const t = setTimeout(() => { if (!off) setReady(true); }, 150);
+    return () => { off = true; clearTimeout(t); };
+  }, []);
+
+  React.useEffect(() => {
+    if (!didRead.current) return;
+    if (skipNextWrite.current) { skipNextWrite.current = false; return; }
+    const t = setTimeout(() => {
+      window.omelette?.writeFile(DC_STATE_FILE, JSON.stringify({ sections: state.sections })).catch(() => {});
+    }, 250);
+    return () => clearTimeout(t);
+  }, [state.sections]);
+
+  // Build registries synchronously from children so FocusOverlay can read
+  // them in the same render. Only direct DCSection > DCArtboard children are
+  // walked — wrapping them in other elements opts out of focus/reorder.
+  const registry = {};     // slotId -> { sectionId, artboard }
+  const sectionMeta = {};  // sectionId -> { title, subtitle, slotIds[] }
+  const sectionOrder = [];
+  React.Children.forEach(children, (sec) => {
+    if (!sec || sec.type !== DCSection) return;
+    const sid = sec.props.id ?? sec.props.title;
+    if (!sid) return;
+    sectionOrder.push(sid);
+    const persisted = state.sections[sid] || {};
+    const abs = [];
+    React.Children.forEach(sec.props.children, (ab) => {
+      if (!ab || ab.type !== DCArtboard) return;
+      const aid = ab.props.id ?? ab.props.label;
+      if (aid) abs.push([aid, ab]);
+    });
+    // hidden is scoped to one source revision — when the agent regenerates
+    // (artboard-ID set changes), prior deletes don't apply to new content.
+    const srcKey = abs.map(([k]) => k).join('\x1f');
+    const hidden = persisted.srcKey === srcKey ? (persisted.hidden || []) : [];
+    const srcIds = [];
+    abs.forEach(([aid, ab]) => {
+      if (hidden.includes(aid)) return;
+      registry[`${sid}/${aid}`] = { sectionId: sid, artboard: ab };
+      srcIds.push(aid);
+    });
+    const kept = (persisted.order || []).filter((k) => srcIds.includes(k));
+    sectionMeta[sid] = {
+      title: persisted.title ?? sec.props.title,
+      subtitle: sec.props.subtitle,
+      slotIds: [...kept, ...srcIds.filter((k) => !kept.includes(k))],
+    };
+  });
+
+  const api = React.useMemo(() => ({
+    state,
+    section: (id) => state.sections[id] || {},
+    patchSection: (id, p) => setState((s) => ({
+      ...s,
+      sections: { ...s.sections, [id]: { ...s.sections[id], ...(typeof p === 'function' ? p(s.sections[id] || {}) : p) } },
+    })),
+    setFocus: (slotId) => setState((s) => ({ ...s, focus: slotId })),
+  }), [state]);
+
+  // Esc exits focus; any outside pointerdown commits an in-progress rename.
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') api.setFocus(null); };
+    const onPd = (e) => {
+      const ae = document.activeElement;
+      if (ae && ae.isContentEditable && !ae.contains(e.target)) ae.blur();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPd, true);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPd, true);
+    };
+  }, [api]);
+
+  return (
+    <DCCtx.Provider value={api}>
+      <DCViewport minScale={minScale} maxScale={maxScale} style={style}>{ready && children}</DCViewport>
+      {state.focus && registry[state.focus] && (
+        <DCFocusOverlay entry={registry[state.focus]} sectionMeta={sectionMeta} sectionOrder={sectionOrder} />
+      )}
+    </DCCtx.Provider>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DCViewport — transform-based pan/zoom (internal)
+//
+// Input mapping (Figma-style):
+//   • trackpad pinch  → zoom   (ctrlKey wheel; Safari gesture* events)
+//   • trackpad scroll → pan    (two-finger)
+//   • mouse wheel     → zoom   (notched; distinguished from trackpad scroll)
+//   • middle-drag / primary-drag-on-bg → pan
+//
+// Transform state lives in a ref and is written straight to the DOM
+// (translate3d + will-change) so wheel ticks don't go through React —
+// keeps pans at 60fps on dense canvases.
+// ─────────────────────────────────────────────────────────────
+function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
+  const vpRef = React.useRef(null);
+  const worldRef = React.useRef(null);
+  const tf = React.useRef({ x: 0, y: 0, scale: 1 });
+  // Persist viewport across reloads so the user lands back where they were
+  // after an agent edit or browser refresh. The sandbox origin is already
+  // per-project; pathname keeps multiple canvas files in one project apart.
+  const tfKey = 'dc-viewport:' + location.pathname;
+  const saveT = React.useRef(0);
+
+  const lastPostedScale = React.useRef();
+  const apply = React.useCallback(() => {
+    const { x, y, scale } = tf.current;
+    const el = worldRef.current;
+    if (!el) return;
+    el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+    // Exposed for zoom-invariant chrome (labels, buttons, TweaksPanel).
+    el.style.setProperty('--dc-inv-zoom', String(1 / scale));
+    // Keep the host toolbar's % readout in sync with the canvas scale. Pan
+    // ticks leave scale unchanged — skip the cross-frame post for those.
+    if (lastPostedScale.current !== scale) {
+      lastPostedScale.current = scale;
+      window.parent.postMessage({ type: '__dc_zoom', scale }, '*');
+    }
+    clearTimeout(saveT.current);
+    saveT.current = setTimeout(() => {
+      try { localStorage.setItem(tfKey, JSON.stringify(tf.current)); } catch {}
+    }, 200);
+  }, [tfKey]);
+
+  React.useLayoutEffect(() => {
+    const flush = () => {
+      clearTimeout(saveT.current);
+      try { localStorage.setItem(tfKey, JSON.stringify(tf.current)); } catch {}
+    };
+    try {
+      const s = JSON.parse(localStorage.getItem(tfKey) || 'null');
+      if (s && Number.isFinite(s.x) && Number.isFinite(s.y) && Number.isFinite(s.scale)) {
+        tf.current = { x: s.x, y: s.y, scale: Math.min(maxScale, Math.max(minScale, s.scale)) };
+        apply();
+      }
+    } catch {}
+    // Flush on pagehide and unmount so a reload within the 200ms debounce
+    // window doesn't drop the last pan/zoom.
+    window.addEventListener('pagehide', flush);
+    return () => { window.removeEventListener('pagehide', flush); flush(); };
+  }, []);
+
+  React.useEffect(() => {
+    const vp = vpRef.current;
+    if (!vp) return;
+
+    const zoomAt = (cx, cy, factor) => {
+      const r = vp.getBoundingClientRect();
+      const px = cx - r.left, py = cy - r.top;
+      const t = tf.current;
+      const next = Math.min(maxScale, Math.max(minScale, t.scale * factor));
+      const k = next / t.scale;
+      // keep the world point under the cursor fixed
+      t.x = px - (px - t.x) * k;
+      t.y = py - (py - t.y) * k;
+      t.scale = next;
+      apply();
+    };
+
+    // Mouse-wheel vs trackpad-scroll heuristic. A physical wheel sends
+    // line-mode deltas (Firefox) or large integer pixel deltas with no X
+    // component (Chrome/Safari, typically multiples of 100/120). Trackpad
+    // two-finger scroll sends small/fractional pixel deltas, often with
+    // non-zero deltaX. ctrlKey is set by the browser for trackpad pinch.
+    const isMouseWheel = (e) =>
+      e.deltaMode !== 0 ||
+      (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 40);
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      if (isGesturing) return; // Safari: gesture* owns the pinch — discard concurrent wheels
+      if ((e.ctrlKey || e.metaKey) && !isMouseWheel(e)) {
+        // trackpad pinch, or ctrl/cmd + smooth-scroll mouse. Notched
+        // wheels fall through to the fixed-step branch below.
+        zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
+      } else if (isMouseWheel(e)) {
+        // notched mouse wheel — fixed-ratio step per click
+        zoomAt(e.clientX, e.clientY, Math.exp(-Math.sign(e.deltaY) * 0.18));
+      } else {
+        // trackpad two-finger scroll — pan
+        tf.current.x -= e.deltaX;
+        tf.current.y -= e.deltaY;
+        apply();
+      }
+    };
+
+    // Safari sends native gesture* events for trackpad pinch with a smooth
+    // e.scale; preferring these over the ctrl+wheel fallback gives a much
+    // better feel there. No-ops on other browsers. Safari also fires
+    // ctrlKey wheel events during the same pinch — isGesturing makes
+    // onWheel drop those entirely so they neither zoom nor pan.
+    let gsBase = 1;
+    let isGesturing = false;
+    const onGestureStart = (e) => { e.preventDefault(); isGesturing = true; gsBase = tf.current.scale; };
+    const onGestureChange = (e) => {
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, (gsBase * e.scale) / tf.current.scale);
+    };
+    const onGestureEnd = (e) => { e.preventDefault(); isGesturing = false; };
+
+    // Drag-pan: middle button anywhere, or primary button on canvas
+    // background (anything that isn't an artboard or an inline editor).
+    let drag = null;
+    const onPointerDown = (e) => {
+      const onBg = !e.target.closest('[data-dc-slot], .dc-editable');
+      if (!(e.button === 1 || (e.button === 0 && onBg))) return;
+      e.preventDefault();
+      vp.setPointerCapture(e.pointerId);
+      drag = { id: e.pointerId, lx: e.clientX, ly: e.clientY };
+      vp.style.cursor = 'grabbing';
+    };
+    const onPointerMove = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      tf.current.x += e.clientX - drag.lx;
+      tf.current.y += e.clientY - drag.ly;
+      drag.lx = e.clientX; drag.ly = e.clientY;
+      apply();
+    };
+    const onPointerUp = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      vp.releasePointerCapture(e.pointerId);
+      drag = null;
+      vp.style.cursor = '';
+    };
+
+    // Host-driven zoom (toolbar % menu). Zooms around viewport centre so the
+    // visible midpoint stays fixed — matching the host's iframe-zoom feel.
+    const onHostMsg = (e) => {
+      const d = e.data;
+      if (d && d.type === '__dc_set_zoom' && typeof d.scale === 'number') {
+        const r = vp.getBoundingClientRect();
+        zoomAt(r.left + r.width / 2, r.top + r.height / 2, d.scale / tf.current.scale);
+      } else if (d && d.type === '__dc_probe') {
+        // Host's [readyGen] reset asks whether a canvas is present; it
+        // fires on the iframe's native 'load', which for canvases with
+        // images/fonts is after our mount-time announce, so re-announce.
+        // Clear the pan-tick guard so apply() re-posts the current scale
+        // even if it's unchanged — the host just reset dcScale to 1.
+        window.parent.postMessage({ type: '__dc_present' }, '*');
+        lastPostedScale.current = undefined;
+        apply();
+      }
+    };
+    window.addEventListener('message', onHostMsg);
+    // Announce canvas mode so the host toolbar proxies its % control here
+    // instead of scaling the iframe element (which would just shrink the
+    // viewport window of an infinite canvas). The apply() that follows emits
+    // the initial __dc_zoom so the toolbar % is correct before first pinch.
+    // lastPostedScale reset mirrors the __dc_probe handler: the layout
+    // effect's restore-path apply() may already have posted the restored
+    // scale (before __dc_present), so clear the guard to re-post it in order.
+    window.parent.postMessage({ type: '__dc_present' }, '*');
+    lastPostedScale.current = undefined;
+    apply();
+
+    vp.addEventListener('wheel', onWheel, { passive: false });
+    vp.addEventListener('gesturestart', onGestureStart, { passive: false });
+    vp.addEventListener('gesturechange', onGestureChange, { passive: false });
+    vp.addEventListener('gestureend', onGestureEnd, { passive: false });
+    vp.addEventListener('pointerdown', onPointerDown);
+    vp.addEventListener('pointermove', onPointerMove);
+    vp.addEventListener('pointerup', onPointerUp);
+    vp.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      window.removeEventListener('message', onHostMsg);
+      vp.removeEventListener('wheel', onWheel);
+      vp.removeEventListener('gesturestart', onGestureStart);
+      vp.removeEventListener('gesturechange', onGestureChange);
+      vp.removeEventListener('gestureend', onGestureEnd);
+      vp.removeEventListener('pointerdown', onPointerDown);
+      vp.removeEventListener('pointermove', onPointerMove);
+      vp.removeEventListener('pointerup', onPointerUp);
+      vp.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [apply, minScale, maxScale]);
+
+  const gridSvg = `url("data:image/svg+xml,%3Csvg width='120' height='120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M120 0H0v120' fill='none' stroke='${encodeURIComponent(DC.grid)}' stroke-width='1'/%3E%3C/svg%3E")`;
+  return (
+    <div
+      ref={vpRef}
+      className="design-canvas"
+      style={{
+        height: '100vh', width: '100vw',
+        background: DC.bg,
+        overflow: 'hidden',
+        overscrollBehavior: 'none',
+        touchAction: 'none',
+        position: 'relative',
+        fontFamily: DC.font,
+        boxSizing: 'border-box',
+        ...style,
+      }}
+    >
+      <div
+        ref={worldRef}
+        style={{
+          position: 'absolute', top: 0, left: 0,
+          transformOrigin: '0 0',
+          willChange: 'transform',
+          width: 'max-content', minWidth: '100%',
+          minHeight: '100%',
+          padding: '60px 0 80px',
+        }}
+      >
+        <div style={{ position: 'absolute', inset: -6000, backgroundImage: gridSvg, backgroundSize: '120px 120px', pointerEvents: 'none', zIndex: -1 }} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DCSection — editable title + h-row of artboards in persisted order
+// ─────────────────────────────────────────────────────────────
+function DCSection({ id, title, subtitle, children, gap = 48 }) {
+  const ctx = React.useContext(DCCtx);
+  const sid = id ?? title;
+  const all = React.Children.toArray(children);
+  const artboards = all.filter((c) => c && c.type === DCArtboard);
+  const rest = all.filter((c) => !(c && c.type === DCArtboard));
+  const sec = (ctx && sid && ctx.section(sid)) || {};
+  // Must match DesignCanvas's srcKey computation exactly (it filters falsy
+  // IDs), or onDelete persists a srcKey that DesignCanvas never recognizes.
+  const allIds = artboards.map((a) => a.props.id ?? a.props.label).filter(Boolean);
+  const srcKey = allIds.join('\x1f');
+  const hidden = sec.srcKey === srcKey ? (sec.hidden || []) : [];
+  const srcOrder = allIds.filter((k) => !hidden.includes(k));
+
+  const order = React.useMemo(() => {
+    const kept = (sec.order || []).filter((k) => srcOrder.includes(k));
+    return [...kept, ...srcOrder.filter((k) => !kept.includes(k))];
+  }, [sec.order, srcOrder.join('|')]);
+
+  const byId = Object.fromEntries(artboards.map((a) => [a.props.id ?? a.props.label, a]));
+
+  // marginBottom counter-scales so the on-screen gap between sections stays
+  // constant — otherwise at low zoom the (world-space) gap collapses while
+  // the screen-constant sectionhead below it doesn't, and the title reads as
+  // belonging to the section above. paddingBottom below is just enough for
+  // the 24px artboard-header (abs-positioned above each card) plus ~8px, so
+  // the title sits tight against its own row at every zoom.
+  return (
+    <div data-dc-section={sid}
+      style={{ marginBottom: 'calc(80px * var(--dc-inv-zoom, 1))', position: 'relative' }}>
+      <div style={{ padding: '0 60px' }}>
+        <div className="dc-sectionhead" style={{ paddingBottom: 36 }}>
+          <DCEditable tag="div" value={sec.title ?? title}
+            onChange={(v) => ctx && sid && ctx.patchSection(sid, { title: v })}
+            style={{ fontSize: 28, fontWeight: 600, color: DC.title, letterSpacing: -0.4, marginBottom: 6, display: 'inline-block' }} />
+          {subtitle && <div style={{ fontSize: 16, color: DC.subtitle }}>{subtitle}</div>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap, padding: '0 60px', alignItems: 'flex-start', width: 'max-content' }}>
+        {order.map((k) => (
+          <DCArtboardFrame key={k} sectionId={sid} artboard={byId[k]} order={order}
+            label={(sec.labels || {})[k] ?? byId[k].props.label}
+            onRename={(v) => ctx && ctx.patchSection(sid, (x) => ({ labels: { ...x.labels, [k]: v } }))}
+            onReorder={(next) => ctx && ctx.patchSection(sid, { order: next })}
+            onDelete={() => ctx && ctx.patchSection(sid, (x) => ({
+              hidden: [...(x.srcKey === srcKey ? (x.hidden || []) : []), k],
+              srcKey,
+            }))}
+            onFocus={() => ctx && ctx.setFocus(`${sid}/${k}`)} />
+        ))}
+      </div>
+      {rest}
+    </div>
+  );
+}
+
+// DCArtboard — marker; rendered by DCArtboardFrame via DCSection.
+function DCArtboard() { return null; }
+
+// Per-artboard export (kind: 'png' | 'html'). Both paths share the same
+// self-contained clone: computed styles baked in, @font-face / <img> /
+// inline-style background-image urls inlined as data URIs. PNG wraps the
+// clone in foreignObject→canvas at 3× the artboard's natural width×height
+// (same pipeline the host uses for page captures); HTML wraps it in a
+// minimal standalone document. Both are independent of viewport zoom.
+async function dcExport(node, w, h, name, kind) {
+  try { await document.fonts.ready; } catch {}
+  const toDataURL = (url) => fetch(url).then((r) => r.blob()).then((b) => new Promise((res) => {
+    const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(url); fr.readAsDataURL(b);
+  })).catch(() => url);
+
+  // Collect @font-face rules. ss.cssRules throws SecurityError on
+  // cross-origin sheets (e.g. fonts.googleapis.com) — in that case fetch
+  // the CSS text directly (those endpoints send ACAO:*) and regex-extract
+  // the blocks. @import and @media/@supports are walked so nested
+  // @font-face rules aren't missed.
+  const fontRules = [], pending = [], seen = new Set();
+  const scrapeCss = (href) => {
+    if (seen.has(href)) return; seen.add(href);
+    pending.push(fetch(href).then((r) => r.text()).then((css) => {
+      for (const m of css.match(/@font-face\s*{[^}]*}/g) || []) fontRules.push({ css: m, base: href });
+      for (const m of css.matchAll(/@import\s+(?:url\()?['"]?([^'")\s;]+)/g))
+        scrapeCss(new URL(m[1], href).href);
+    }).catch(() => {}));
+  };
+  const walk = (rules, base) => {
+    for (const r of rules) {
+      if (r.type === CSSRule.FONT_FACE_RULE) fontRules.push({ css: r.cssText, base });
+      else if (r.type === CSSRule.IMPORT_RULE && r.styleSheet) {
+        const ibase = r.styleSheet.href || base;
+        try { walk(r.styleSheet.cssRules, ibase); } catch { scrapeCss(ibase); }
+      } else if (r.cssRules) walk(r.cssRules, base);
+    }
+  };
+  for (const ss of document.styleSheets) {
+    const base = ss.href || location.href;
+    try { walk(ss.cssRules, base); } catch { if (ss.href) scrapeCss(ss.href); }
+  }
+  while (pending.length) await pending.shift();
+  const fontCss = (await Promise.all(fontRules.map(async (rule) => {
+    let out = rule.css, m; const re = /url\((['"]?)([^'")]+)\1\)/g;
+    while ((m = re.exec(rule.css))) {
+      if (m[2].indexOf('data:') === 0) continue;
+      let abs; try { abs = new URL(m[2], rule.base).href; } catch { continue; }
+      out = out.split(m[0]).join('url("' + await toDataURL(abs) + '")');
+    }
+    return out;
+  }))).join('\n');
+
+  const cloneStyled = (src) => {
+    if (src.nodeType === 8 || (src.nodeType === 1 && src.tagName === 'SCRIPT')) return document.createTextNode('');
+    const dst = src.cloneNode(false);
+    if (src.nodeType === 1) {
+      const cs = getComputedStyle(src); let txt = '';
+      for (let i = 0; i < cs.length; i++) txt += cs[i] + ':' + cs.getPropertyValue(cs[i]) + ';';
+      dst.setAttribute('style', txt + 'animation:none;transition:none;');
+      if (src.tagName === 'CANVAS') try { const im = document.createElement('img'); im.src = src.toDataURL(); im.setAttribute('style', txt); return im; } catch {}
+    }
+    for (let c = src.firstChild; c; c = c.nextSibling) dst.appendChild(cloneStyled(c));
+    return dst;
+  };
+  const clone = cloneStyled(node);
+  clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  // Drop the card's own shadow/radius so the export is a flush w×h rect;
+  // the artboard's own background (if any) is already in the computed style.
+  clone.style.boxShadow = 'none'; clone.style.borderRadius = '0';
+
+  const jobs = [];
+  clone.querySelectorAll('img').forEach((el) => {
+    const s = el.getAttribute('src');
+    if (s && s.indexOf('data:') !== 0) jobs.push(toDataURL(el.src).then((d) => el.setAttribute('src', d)));
+  });
+  [clone, ...clone.querySelectorAll('*')].forEach((el) => {
+    const bg = el.style.backgroundImage; if (!bg) return;
+    let m; const re = /url\(["']?([^"')]+)["']?\)/g;
+    while ((m = re.exec(bg))) {
+      const tok = m[0], url = m[1];
+      if (url.indexOf('data:') === 0) continue;
+      jobs.push(toDataURL(url).then((d) => { el.style.backgroundImage = el.style.backgroundImage.split(tok).join('url("' + d + '")'); }));
+    }
+  });
+  await Promise.all(jobs);
+
+  const xml = new XMLSerializer().serializeToString(clone);
+  const save = (blob, ext) => {
+    if (!blob) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name + '.' + ext; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+
+  if (kind === 'html') {
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + name + '</title>' +
+      (fontCss ? '<style>' + fontCss + '</style>' : '') +
+      '</head><body style="margin:0">' + xml + '</body></html>';
+    return save(new Blob([html], { type: 'text/html' }), 'html');
+  }
+
+  // PNG: the SVG's own width/height must be the output resolution — an
+  // <img>-loaded SVG rasterizes at its intrinsic size, so sizing it at 1×
+  // and ctx.scale()-ing up would just upscale a 1× bitmap. viewBox maps the
+  // w×h foreignObject onto the px·w × px·h SVG canvas so the browser renders
+  // the HTML at full resolution.
+  const px = 3;
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w * px + '" height="' + h * px +
+    '" viewBox="0 0 ' + w + ' ' + h + '"><foreignObject width="' + w + '" height="' + h + '">' +
+    (fontCss ? '<style><![CDATA[' + fontCss + ']]></style>' : '') + xml + '</foreignObject></svg>';
+  const img = new Image();
+  await new Promise((res, rej) => {
+    img.onload = res; img.onerror = () => rej(new Error('svg load failed'));
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+  const cv = document.createElement('canvas');
+  cv.width = w * px; cv.height = h * px;
+  cv.getContext('2d').drawImage(img, 0, 0);
+  cv.toBlob((blob) => save(blob, 'png'), 'image/png');
+}
+
+function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorder, onFocus, onDelete }) {
+  const { id: rawId, label: rawLabel, width = 260, height = 480, children, style = {} } = artboard.props;
+  const id = rawId ?? rawLabel;
+  const ref = React.useRef(null);
+  const cardRef = React.useRef(null);
+  const menuRef = React.useRef(null);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [confirming, setConfirming] = React.useState(false);
+
+  // ⋯ menu: close on any outside pointerdown. Two-click delete lives inside
+  // the menu — first click arms the row, second commits; closing disarms.
+  React.useEffect(() => {
+    if (!menuOpen) { setConfirming(false); return; }
+    const off = (e) => { if (!menuRef.current || !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener('pointerdown', off, true);
+    return () => document.removeEventListener('pointerdown', off, true);
+  }, [menuOpen]);
+
+  const doExport = (kind) => {
+    setMenuOpen(false);
+    if (!cardRef.current) return;
+    const name = String(label || id || 'artboard').replace(/[^\w\s.-]+/g, '_');
+    dcExport(cardRef.current, width, height, name, kind)
+      .catch((e) => console.error('[design-canvas] export failed:', e));
+  };
+
+  // Live drag-reorder: dragged card sticks to cursor; siblings slide into
+  // their would-be slots in real time via transforms. DOM order only
+  // changes on drop.
+  const onGripDown = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const me = ref.current;
+    // translateX is applied in local (pre-scale) space but pointer deltas and
+    // getBoundingClientRect().left are screen-space — divide by the viewport's
+    // current scale so the dragged card tracks the cursor at any zoom level.
+    const scale = me.getBoundingClientRect().width / me.offsetWidth || 1;
+    const peers = Array.from(document.querySelectorAll(`[data-dc-section="${sectionId}"] [data-dc-slot]`));
+    const homes = peers.map((el) => ({ el, id: el.dataset.dcSlot, x: el.getBoundingClientRect().left }));
+    const slotXs = homes.map((h) => h.x);
+    const startIdx = order.indexOf(id);
+    const startX = e.clientX;
+    let liveOrder = order.slice();
+    me.classList.add('dc-dragging');
+
+    const layout = () => {
+      for (const h of homes) {
+        if (h.id === id) continue;
+        const slot = liveOrder.indexOf(h.id);
+        h.el.style.transform = `translateX(${(slotXs[slot] - h.x) / scale}px)`;
+      }
+    };
+
+    const move = (ev) => {
+      const dx = ev.clientX - startX;
+      me.style.transform = `translateX(${dx / scale}px)`;
+      const cur = homes[startIdx].x + dx;
+      let nearest = 0, best = Infinity;
+      for (let i = 0; i < slotXs.length; i++) {
+        const d = Math.abs(slotXs[i] - cur);
+        if (d < best) { best = d; nearest = i; }
+      }
+      if (liveOrder.indexOf(id) !== nearest) {
+        liveOrder = order.filter((k) => k !== id);
+        liveOrder.splice(nearest, 0, id);
+        layout();
+      }
+    };
+
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      const finalSlot = liveOrder.indexOf(id);
+      me.classList.remove('dc-dragging');
+      me.style.transform = `translateX(${(slotXs[finalSlot] - homes[startIdx].x) / scale}px)`;
+      // After the settle transition, kill transitions + clear transforms +
+      // commit the reorder in the same frame so there's no visual snap-back.
+      setTimeout(() => {
+        for (const h of homes) { h.el.style.transition = 'none'; h.el.style.transform = ''; }
+        if (liveOrder.join('|') !== order.join('|')) onReorder(liveOrder);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          for (const h of homes) h.el.style.transition = '';
+        }));
+      }, 180);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  };
+
+  return (
+    <div ref={ref} data-dc-slot={id} style={{ position: 'relative', flexShrink: 0 }}>
+      <div className="dc-header" style={{ color: DC.label }} onPointerDown={(e) => e.stopPropagation()}>
+        <div className="dc-labelrow">
+          <div className="dc-grip" onPointerDown={onGripDown} title="Drag to reorder">
+            <svg width="9" height="13" viewBox="0 0 9 13" fill="currentColor"><circle cx="2" cy="2" r="1.1"/><circle cx="7" cy="2" r="1.1"/><circle cx="2" cy="6.5" r="1.1"/><circle cx="7" cy="6.5" r="1.1"/><circle cx="2" cy="11" r="1.1"/><circle cx="7" cy="11" r="1.1"/></svg>
+          </div>
+          <div className="dc-labeltext" onClick={onFocus} title="Click to focus">
+            <DCEditable value={label} onChange={onRename} onClick={(e) => e.stopPropagation()}
+              style={{ fontSize: 15, fontWeight: 500, color: DC.label, lineHeight: 1 }} />
+          </div>
+        </div>
+        <div className="dc-btns">
+          <div ref={menuRef} style={{ position: 'relative' }}>
+            <button className="dc-kebab" title="More" onClick={() => setMenuOpen((o) => !o)}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><circle cx="2.5" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="9.5" cy="6" r="1.1"/></svg>
+            </button>
+            {menuOpen && (
+              <div className="dc-menu" onPointerDown={(e) => e.stopPropagation()}>
+                <button onClick={() => doExport('png')}>Download PNG</button>
+                <button onClick={() => doExport('html')}>Download HTML</button>
+                <hr />
+                <button className="dc-danger"
+                  onClick={() => { if (confirming) { setMenuOpen(false); onDelete(); } else setConfirming(true); }}>
+                  {confirming ? 'Click again to delete' : 'Delete'}
+                </button>
+              </div>
+            )}
+          </div>
+          <button className="dc-expand" onClick={onFocus} title="Focus">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M7 1h4v4M5 11H1V7M11 1L7.5 4.5M1 11l3.5-3.5"/></svg>
+          </button>
+        </div>
+      </div>
+      <div ref={cardRef} className="dc-card"
+        style={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06)', overflow: 'hidden', width, height, background: '#fff', ...style }}>
+        {children || <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 13, fontFamily: DC.font }}>{id}</div>}
+      </div>
+    </div>
+  );
+}
+
+// Inline rename — commits on blur or Enter.
+function DCEditable({ value, onChange, style, tag = 'span', onClick }) {
+  const T = tag;
+  return (
+    <T className="dc-editable" contentEditable suppressContentEditableWarning
+      onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      onBlur={(e) => onChange && onChange(e.currentTarget.textContent)}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+      style={style}>{value}</T>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Focus mode — overlay one artboard; ←/→ within section, ↑/↓ across
+// sections, Esc or backdrop click to exit.
+// ─────────────────────────────────────────────────────────────
+function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
+  const ctx = React.useContext(DCCtx);
+  const { sectionId, artboard } = entry;
+  const sec = ctx.section(sectionId);
+  const meta = sectionMeta[sectionId];
+  const peers = meta.slotIds;
+  const aid = artboard.props.id ?? artboard.props.label;
+  const idx = peers.indexOf(aid);
+  const secIdx = sectionOrder.indexOf(sectionId);
+
+  const go = (d) => { const n = peers[(idx + d + peers.length) % peers.length]; if (n) ctx.setFocus(`${sectionId}/${n}`); };
+  const goSection = (d) => {
+    // Sections whose artboards are all deleted have slotIds:[] — step past
+    // them to the next non-empty section so ↑/↓ doesn't dead-end.
+    const n = sectionOrder.length;
+    for (let i = 1; i < n; i++) {
+      const ns = sectionOrder[(((secIdx + d * i) % n) + n) % n];
+      const first = sectionMeta[ns] && sectionMeta[ns].slotIds[0];
+      if (first) { ctx.setFocus(`${ns}/${first}`); return; }
+    }
+  };
+
+  React.useEffect(() => {
+    const k = (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); goSection(-1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); goSection(1); }
+    };
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  });
+
+  const { width = 260, height = 480, children } = artboard.props;
+  const [vp, setVp] = React.useState({ w: window.innerWidth, h: window.innerHeight });
+  React.useEffect(() => { const r = () => setVp({ w: window.innerWidth, h: window.innerHeight }); window.addEventListener('resize', r); return () => window.removeEventListener('resize', r); }, []);
+  const scale = Math.max(0.1, Math.min((vp.w - 200) / width, (vp.h - 260) / height, 2));
+
+  const [ddOpen, setDd] = React.useState(false);
+  const Arrow = ({ dir, onClick }) => (
+    <button onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{ position: 'absolute', top: '50%', [dir]: 28, transform: 'translateY(-50%)',
+        border: 'none', background: 'rgba(255,255,255,.08)', color: 'rgba(255,255,255,.9)',
+        width: 44, height: 44, borderRadius: 22, fontSize: 18, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .15s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.18)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.08)')}>
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d={dir === 'left' ? 'M11 3L5 9l6 6' : 'M7 3l6 6-6 6'} /></svg>
+    </button>
+  );
+
+  // Portal to body so position:fixed is the real viewport regardless of any
+  // transform on DesignCanvas's ancestors (including the canvas zoom itself).
+  return ReactDOM.createPortal(
+    <div onClick={() => ctx.setFocus(null)}
+      onWheel={(e) => e.preventDefault()}
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(24,20,16,.6)', backdropFilter: 'blur(14px)',
+        fontFamily: DC.font, color: '#fff' }}>
+
+      {/* top bar: section dropdown (left) · close (right) */}
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 72, display: 'flex', alignItems: 'flex-start', padding: '16px 20px 0', gap: 16 }}>
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setDd((o) => !o)}
+            style={{ border: 'none', background: 'transparent', color: '#fff', cursor: 'pointer', padding: '6px 8px',
+              borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.3 }}>{meta.title}</span>
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ opacity: .7 }}><path d="M2 4l3.5 3.5L9 4"/></svg>
+            </span>
+            {meta.subtitle && <span style={{ display: 'block', fontSize: 13, opacity: .6, fontWeight: 400, marginTop: 2 }}>{meta.subtitle}</span>}
+          </button>
+          {ddOpen && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: '#2a251f', borderRadius: 8,
+              boxShadow: '0 8px 32px rgba(0,0,0,.4)', padding: 4, minWidth: 200, zIndex: 10 }}>
+              {sectionOrder.filter((sid) => sectionMeta[sid].slotIds.length).map((sid) => (
+                <button key={sid} onClick={() => { setDd(false); const f = sectionMeta[sid].slotIds[0]; if (f) ctx.setFocus(`${sid}/${f}`); }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
+                    background: sid === sectionId ? 'rgba(255,255,255,.1)' : 'transparent', color: '#fff',
+                    padding: '8px 12px', borderRadius: 5, fontSize: 14, fontWeight: sid === sectionId ? 600 : 400, fontFamily: 'inherit' }}>
+                  {sectionMeta[sid].title}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => ctx.setFocus(null)}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.12)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,.7)', width: 32, height: 32,
+            borderRadius: 16, fontSize: 20, cursor: 'pointer', lineHeight: 1, transition: 'background .12s' }}>×</button>
+      </div>
+
+      {/* card centered, label + index below — only the card itself stops
+          propagation so any backdrop click (including the margins around
+          the card) exits focus */}
+      <div
+        style={{ position: 'absolute', top: 64, bottom: 56, left: 100, right: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ width: width * scale, height: height * scale, position: 'relative' }}>
+          <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left', background: '#fff', borderRadius: 2, overflow: 'hidden',
+            boxShadow: '0 20px 80px rgba(0,0,0,.4)' }}>
+            {children || <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb' }}>{aid}</div>}
+          </div>
+        </div>
+        <div onClick={(e) => e.stopPropagation()} style={{ fontSize: 14, fontWeight: 500, opacity: .85, textAlign: 'center' }}>
+          {(sec.labels || {})[aid] ?? artboard.props.label}
+          <span style={{ opacity: .5, marginLeft: 10, fontVariantNumeric: 'tabular-nums' }}>{idx + 1} / {peers.length}</span>
+        </div>
+      </div>
+
+      <Arrow dir="left" onClick={() => go(-1)} />
+      <Arrow dir="right" onClick={() => go(1)} />
+
+      {/* dots */}
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
+        {peers.map((p, i) => (
+          <button key={p} onClick={() => ctx.setFocus(`${sectionId}/${p}`)}
+            style={{ border: 'none', padding: 0, cursor: 'pointer', width: 6, height: 6, borderRadius: 3,
+              background: i === idx ? '#fff' : 'rgba(255,255,255,.3)' }} />
+        ))}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Post-it — absolute-positioned sticky note
+// ─────────────────────────────────────────────────────────────
+function DCPostIt({ children, top, left, right, bottom, rotate = -2, width = 180 }) {
+  return (
+    <div style={{
+      position: 'absolute', top, left, right, bottom, width,
+      background: DC.postitBg, padding: '14px 16px',
+      fontFamily: '"Comic Sans MS", "Marker Felt", "Segoe Print", cursive',
+      fontSize: 14, lineHeight: 1.4, color: DC.postitText,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+      transform: `rotate(${rotate}deg)`,
+      zIndex: 5,
+    }}>{children}</div>
+  );
+}
+
+Object.assign(window, { DesignCanvas, DCSection, DCArtboard, DCPostIt });
+
+
+</script>
+<script type="text/babel" data-presets="react" data-label="tweaks-panel">
+
+// tweaks-panel.jsx
+// Reusable Tweaks shell + form-control helpers.
+//
+// Owns the host protocol (listens for __activate_edit_mode / __deactivate_edit_mode,
+// posts __edit_mode_available / __edit_mode_set_keys / __edit_mode_dismissed) so
+// individual prototypes don't re-roll it. Ships a consistent set of controls so you
+// don't hand-draw <input type="range">, segmented radios, steppers, etc.
+//
+// Usage (in an HTML file that loads React + Babel):
+//
+//   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+//     "primaryColor": "#D97757",
+//     "palette": ["#D97757", "#29261b", "#f6f4ef"],
+//     "fontSize": 16,
+//     "density": "regular",
+//     "dark": false
+//   }/*EDITMODE-END*/;
+//
+//   function App() {
+//     const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+//     return (
+//       <div style={{ fontSize: t.fontSize, color: t.primaryColor }}>
+//         Hello
+//         <TweaksPanel>
+//           <TweakSection label="Typography" />
+//           <TweakSlider label="Font size" value={t.fontSize} min={10} max={32} unit="px"
+//                        onChange={(v) => setTweak('fontSize', v)} />
+//           <TweakRadio  label="Density" value={t.density}
+//                        options={['compact', 'regular', 'comfy']}
+//                        onChange={(v) => setTweak('density', v)} />
+//           <TweakSection label="Theme" />
+//           <TweakColor  label="Primary" value={t.primaryColor}
+//                        options={['#D97757', '#2A6FDB', '#1F8A5B', '#7A5AE0']}
+//                        onChange={(v) => setTweak('primaryColor', v)} />
+//           <TweakColor  label="Palette" value={t.palette}
+//                        options={[['#D97757', '#29261b', '#f6f4ef'],
+//                                  ['#475569', '#0f172a', '#f1f5f9']]}
+//                        onChange={(v) => setTweak('palette', v)} />
+//           <TweakToggle label="Dark mode" value={t.dark}
+//                        onChange={(v) => setTweak('dark', v)} />
+//         </TweaksPanel>
+//       </div>
+//     );
+//   }
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-body::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25);
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+
+  .twk-field{appearance:none;width:100%;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  select.twk-field{padding-right:22px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center}
+
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;
+    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg.dragging .twk-seg-thumb{transition:none}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2;
+    overflow-wrap:anywhere}
+
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+
+  .twk-num{display:flex;align-items:center;height:26px;padding:0 0 0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;background:rgba(255,255,255,.6)}
+  .twk-num-lbl{font-weight:500;color:rgba(41,38,27,.6);cursor:ew-resize;
+    user-select:none;padding-right:8px}
+  .twk-num input{flex:1;min-width:0;height:100%;border:0;background:transparent;
+    font:inherit;font-variant-numeric:tabular-nums;text-align:right;padding:0 8px 0 0;
+    outline:none;color:inherit;-moz-appearance:textfield}
+  .twk-num input::-webkit-inner-spin-button,.twk-num input::-webkit-outer-spin-button{
+    -webkit-appearance:none;margin:0}
+  .twk-num-unit{padding-right:8px;color:rgba(41,38,27,.45)}
+
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+  .twk-btn.secondary:hover{background:rgba(0,0,0,.1)}
+
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-swatch::-moz-color-swatch{border:0;border-radius:5.5px}
+
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06);
+    transition:transform .12s cubic-bezier(.3,.7,.4,1),box-shadow .12s}
+  .twk-chip:hover{transform:translateY(-1px);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 4px 10px rgba(0,0,0,.12)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),
+    0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip>span{position:absolute;top:0;bottom:0;right:0;width:34%;
+    display:flex;flex-direction:column;box-shadow:-1px 0 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i{flex:1;box-shadow:0 -1px 0 rgba(0,0,0,.1)}
+  .twk-chip>span>i:first-child{box-shadow:none}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+// ── useTweaks ───────────────────────────────────────────────────────────────
+// Single source of truth for tweak values. setTweak persists via the host
+// (__edit_mode_set_keys → host rewrites the EDITMODE block on disk).
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  // Accepts either setTweak('key', value) or setTweak({ key: value, ... }) so a
+  // useState-style call doesn't write a "[object Object]" key into the persisted
+  // JSON block.
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    // Same-window signal so in-page listeners (deck-stage rail thumbnails)
+    // can react — the parent message only reaches the host, not peers.
+    window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+// ── TweaksPanel ─────────────────────────────────────────────────────────────
+// Floating shell. Registers the protocol listener BEFORE announcing
+// availability — if the announce ran first, the host's activate could land
+// before our handler exists and the toolbar toggle would silently no-op.
+// The close button posts __edit_mode_dismissed so the host's toolbar toggle
+// flips off in lockstep; the host echoes __deactivate_edit_mode back which
+// is what actually hides the panel.
+function TweaksPanel({ title = 'Tweaks', noDeckControls = false, children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  // Auto-inject a rail toggle when a <deck-stage> is on the page. The
+  // toggle drives the deck's per-viewer _railVisible via window message;
+  // state is mirrored from the same localStorage key the deck reads so
+  // the control reflects reality across reloads. The mechanism is the
+  // message — authors who want custom placement can post it directly
+  // and pass noDeckControls to suppress this one.
+  const hasDeckStage = React.useMemo(
+    () => typeof document !== 'undefined' && !!document.querySelector('deck-stage'),
+    [],
+  );
+  const [railVisible, setRailVisible] = React.useState(() => {
+    try { return localStorage.getItem('deck-stage.railVisible') !== '0'; } catch (e) { return true; }
+  });
+  const toggleRail = (on) => {
+    setRailVisible(on);
+    window.postMessage({ type: '__deck_rail_visible', on }, '*');
+  };
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', clampToViewport);
+      return () => window.removeEventListener('resize', clampToViewport);
+    }
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = {
+        x: startRight - (ev.clientX - sx),
+        y: startBottom - (ev.clientY - sy),
+      };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" data-noncommentable=""
+           style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" aria-label="Close tweaks"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">
+          {hasDeckStage && !noDeckControls && (
+            <TweakSection label="Deck">
+              <TweakToggle label="Thumbnail rail" value={railVisible} onChange={toggleRail} />
+            </TweakSection>
+          )}
+          {children}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout helpers ──────────────────────────────────────────────────────────
+
+function TweakSection({ label, children }) {
+  return (
+    <>
+      <div className="twk-sect">{label}</div>
+      {children}
+    </>
+  );
+}
+
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl">
+        <span>{label}</span>
+        {value != null && <span className="twk-val">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              role="switch" aria-checked={!!value}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+
+function TweakRadio({ label, value, options, onChange }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+  // The active value is read by pointer-move handlers attached for the lifetime
+  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  const valueRef = React.useRef(value);
+  valueRef.current = value;
+
+  // Segments wrap mid-word once per-segment width runs out. The track is
+  // ~248px (280 panel − 28 body pad − 4 seg pad), each button loses 12px
+  // to its own padding, and 11.5px system-ui averages ~6.3px/char — so 2
+  // options fit ~16 chars each, 3 fit ~10. Past that (or >3 options), fall
+  // back to a dropdown rather than wrap.
+  const labelLen = (o) => String(typeof o === 'object' ? o.label : o).length;
+  const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
+  const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
+  if (!fitsAsSegments) {
+    // <select> emits strings — map back to the original option value so the
+    // fallback stays type-preserving (numbers, booleans) like the segment path.
+    const resolve = (s) => {
+      const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
+      return m === undefined ? s : typeof m === 'object' ? m.value : m;
+    };
+    return <TweakSelect label={label} value={value} options={options}
+                        onChange={(s) => onChange(resolve(s))} />;
+  }
+  const opts = options.map((o) => (typeof o === 'object' ? o : { value: o, label: o }));
+  const idx = Math.max(0, opts.findIndex((o) => o.value === value));
+  const n = opts.length;
+
+  const segAt = (clientX) => {
+    const r = trackRef.current.getBoundingClientRect();
+    const inner = r.width - 4;
+    const i = Math.floor(((clientX - r.left - 2) / inner) * n);
+    return opts[Math.max(0, Math.min(n - 1, i))].value;
+  };
+
+  const onPointerDown = (e) => {
+    setDragging(true);
+    const v0 = segAt(e.clientX);
+    if (v0 !== valueRef.current) onChange(v0);
+    const move = (ev) => {
+      if (!trackRef.current) return;
+      const v = segAt(ev.clientX);
+      if (v !== valueRef.current) onChange(v);
+    };
+    const up = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <TweakRow label={label}>
+      <div ref={trackRef} role="radiogroup" onPointerDown={onPointerDown}
+           className={dragging ? 'twk-seg dragging' : 'twk-seg'}>
+        <div className="twk-seg-thumb"
+             style={{ left: `calc(2px + ${idx} * (100% - 4px) / ${n})`,
+                      width: `calc((100% - 4px) / ${n})` }} />
+        {opts.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </TweakRow>
+  );
+}
+
+function TweakText({ label, value, placeholder, onChange }) {
+  return (
+    <TweakRow label={label}>
+      <input className="twk-field" type="text" value={value} placeholder={placeholder}
+             onChange={(e) => onChange(e.target.value)} />
+    </TweakRow>
+  );
+}
+
+function TweakNumber({ label, value, min, max, step = 1, unit = '', onChange }) {
+  const clamp = (n) => {
+    if (min != null && n < min) return min;
+    if (max != null && n > max) return max;
+    return n;
+  };
+  const startRef = React.useRef({ x: 0, val: 0 });
+  const onScrubStart = (e) => {
+    e.preventDefault();
+    startRef.current = { x: e.clientX, val: value };
+    const decimals = (String(step).split('.')[1] || '').length;
+    const move = (ev) => {
+      const dx = ev.clientX - startRef.current.x;
+      const raw = startRef.current.val + dx * step;
+      const snapped = Math.round(raw / step) * step;
+      onChange(clamp(Number(snapped.toFixed(decimals))));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  return (
+    <div className="twk-num">
+      <span className="twk-num-lbl" onPointerDown={onScrubStart}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+             onChange={(e) => onChange(clamp(Number(e.target.value)))} />
+      {unit && <span className="twk-num-unit">{unit}</span>}
+    </div>
+  );
+}
+
+// Relative-luminance contrast pick — checkmarks drawn over a swatch need to
+// read on both #111 and #fafafa without per-option configuration. Hex input
+// only (#rgb / #rrggbb); named or rgb()/hsl() colors fall through to "light".
+function __twkIsLight(hex) {
+  const h = String(hex).replace('#', '');
+  const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');
+  const n = parseInt(x.slice(0, 6), 16);
+  if (Number.isNaN(n)) return true;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return r * 299 + g * 587 + b * 114 > 148000;
+}
+
+const __TwkCheck = ({ light }) => (
+  <svg viewBox="0 0 14 14" aria-hidden="true">
+    <path d="M3 7.2 5.8 10 11 4.2" fill="none" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          stroke={light ? 'rgba(0,0,0,.78)' : '#fff'} />
+  </svg>
+);
+
+// TweakColor — curated color/palette picker. Each option is either a single
+// hex string or an array of 1-5 hex strings; the card adapts — a lone color
+// renders solid, a palette renders colors[0] as the hero (left ~2/3) with the
+// rest stacked in a sharp column on the right. onChange emits the
+// option in the shape it was passed (string stays string, array stays array).
+// Without options it falls back to the native color input for back-compat.
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) {
+    return (
+      <div className="twk-row twk-row-h">
+        <div className="twk-lbl"><span>{label}</span></div>
+        <input type="color" className="twk-swatch" value={value}
+               onChange={(e) => onChange(e.target.value)} />
+      </div>
+    );
+  }
+  // Native <input type=color> emits lowercase hex per the HTML spec, so
+  // compare case-insensitively. String() guards JSON.stringify(undefined),
+  // which returns the primitive undefined (no .toLowerCase).
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <TweakRow label={label}>
+      <div className="twk-chips" role="radiogroup">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero, ...rest] = colors;
+          const sup = rest.slice(0, 4);
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" role="radio"
+                    aria-checked={on} data-on={on ? '1' : '0'}
+                    aria-label={colors.join(', ')} title={colors.join(' · ')}
+                    style={{ background: hero }}
+                    onClick={() => onChange(o)}>
+              {sup.length > 0 && (
+                <span>
+                  {sup.map((c, j) => <i key={j} style={{ background: c }} />)}
+                </span>
+              )}
+              {on && <__TwkCheck light={__twkIsLight(hero)} />}
+            </button>
+          );
+        })}
+      </div>
+    </TweakRow>
+  );
+}
+
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'}
+            onClick={onClick}>{label}</button>
+  );
+}
+
+Object.assign(window, {
+  useTweaks, TweaksPanel, TweakSection, TweakRow,
+  TweakSlider, TweakToggle, TweakRadio, TweakSelect,
+  TweakText, TweakNumber, TweakColor, TweakButton,
+});
+
+</script>
+<script type="text/babel" data-presets="react" data-label="data">
+// data.jsx — initial seed + helpers for the Library Tracker prototype.
+// All state lives in localStorage so the prototype "saves" between reloads.
+
+const LS_KEY = 'lauryn-tracker-state-v1';
+
+const DEFAULT_STATUSES = [
+  { id: 'brief',     label: 'Brief received', color: '#a89b8a' },
+  { id: 'writing',   label: 'Writing',        color: '#c9a14a' },
+  { id: 'written',   label: 'Written',        color: '#7c8a5c' },
+  { id: 'revising',  label: 'Revising',       color: '#b06a3b' },
+  { id: 'needs_rev', label: 'Needs revision', color: '#c44545' },
+  { id: 'sent',      label: 'Demo sent',      color: '#5a7fb0' },
+  { id: 'approved',  label: 'Approved',       color: '#3d8a5f' },
+  { id: 'delivered', label: 'Delivered',      color: '#2c2a26' },
+  { id: 'hold',      label: 'On hold',        color: '#8a8a8a' },
+  { id: 'rejected',  label: 'Rejected',       color: '#6e3535' },
+];
+
+const DEFAULT_CODE_FORMAT = 'DCD {EP_TITLE} v{VERSION} {INITIALS} 2mx';
+
+const DEFAULT_FOLDER_TEMPLATE = [
+  { name: 'TRACK', children: [] },
+  { name: 'DEMO 2MXS', children: [] },
+];
+
+const SEED_TRACKS = [
+  {
+    id: 't_001',
+    code: 'DCD Midnight Garden v1.00 LL 2mx',
+    title: 'Velvet Hours',
+    album: 'Midnight Garden',
+    initials: 'LL',
+    version: '1.00',
+    status: 'writing',
+    publisher: 'Universal Production Music',
+    cost: 1800,
+    invoice: 'unpaid',
+    due: '2026-05-22',
+    brief: 'https://docs.google.com/document/d/midnight-garden-brief',
+    collaborators: ['Lauryn L.', 'Mara K.'],
+    folderPath: '~/Desktop/DCD/Midnight Garden/DCD Midnight Garden v1.00 LL 2mx',
+    created: '2026-04-28',
+    emails: 3,
+  },
+  {
+    id: 't_002',
+    code: 'DCD Lowlight v2.00 LL 2mx',
+    title: 'Slow Burn',
+    album: 'Lowlight',
+    initials: 'LL',
+    version: '2.00',
+    status: 'revising',
+    publisher: 'APM Music',
+    cost: 2400,
+    invoice: 'invoiced',
+    due: '2026-05-12',
+    brief: 'briefs/lowlight-slow-burn.pdf',
+    collaborators: ['Lauryn L.'],
+    folderPath: '~/Desktop/DCD/Lowlight/DCD Lowlight v2.00 LL 2mx',
+    created: '2026-04-15',
+    emails: 7,
+  },
+  {
+    id: 't_003',
+    code: 'DCD Paper Skies v1.00 LL 2mx',
+    title: 'Paper Skies',
+    album: 'Paper Skies',
+    initials: 'LL',
+    version: '1.00',
+    status: 'sent',
+    publisher: 'Extreme Music',
+    cost: 3200,
+    invoice: 'paid',
+    due: '2026-04-30',
+    brief: 'https://notion.so/paper-skies-brief',
+    collaborators: ['Lauryn L.', 'James O.'],
+    folderPath: '~/Desktop/DCD/Paper Skies/DCD Paper Skies v1.00 LL 2mx',
+    created: '2026-04-02',
+    emails: 12,
+  },
+  {
+    id: 't_004',
+    code: 'DCD Hollow Coast v1.00 LL 2mx',
+    title: 'Tide Pull',
+    album: 'Hollow Coast',
+    initials: 'LL',
+    version: '1.00',
+    status: 'needs_rev',
+    publisher: 'Position Music',
+    cost: 2100,
+    invoice: 'unpaid',
+    due: '2026-05-08',
+    brief: 'briefs/hollow-coast.pdf',
+    collaborators: ['Lauryn L.'],
+    folderPath: '~/Desktop/DCD/Hollow Coast/DCD Hollow Coast v1.00 LL 2mx',
+    created: '2026-04-20',
+    emails: 5,
+  },
+  {
+    id: 't_005',
+    code: 'DCD Northstar v1.00 LL 2mx',
+    title: 'Compass',
+    album: 'Northstar',
+    initials: 'LL',
+    version: '1.00',
+    status: 'approved',
+    publisher: 'Warner Chappell PM',
+    cost: 2800,
+    invoice: 'paid',
+    due: '2026-04-18',
+    brief: 'https://docs.google.com/document/d/northstar',
+    collaborators: ['Lauryn L.', 'Theo R.'],
+    folderPath: '~/Desktop/DCD/Northstar/DCD Northstar v1.00 LL 2mx',
+    created: '2026-03-30',
+    emails: 9,
+  },
+  {
+    id: 't_006',
+    code: 'DCD Glasswing v1.00 LL 2mx',
+    title: 'Wingspan',
+    album: 'Glasswing',
+    initials: 'LL',
+    version: '1.00',
+    status: 'delivered',
+    publisher: 'Sony PM',
+    cost: 3500,
+    invoice: 'paid',
+    due: '2026-03-15',
+    brief: 'briefs/glasswing-wingspan.pdf',
+    collaborators: ['Lauryn L.'],
+    folderPath: '~/Desktop/DCD/Glasswing/DCD Glasswing v1.00 LL 2mx',
+    created: '2026-02-28',
+    emails: 14,
+  },
+  {
+    id: 't_007',
+    code: 'DCD Lowlight v1.00 LL 2mx',
+    title: 'Halflight',
+    album: 'Lowlight',
+    initials: 'LL',
+    version: '1.00',
+    status: 'brief',
+    publisher: 'APM Music',
+    cost: 2400,
+    invoice: 'unpaid',
+    due: '2026-05-30',
+    brief: 'briefs/lowlight-halflight.pdf',
+    collaborators: ['Lauryn L.'],
+    folderPath: '~/Desktop/DCD/Lowlight/DCD Lowlight v1.00 LL 2mx',
+    created: '2026-05-02',
+    emails: 1,
+  },
+];
+
+const SEED_INBOX = [
+  {
+    id: 'e_01',
+    from: 'sarah@apmmusic.com',
+    subject: 'Re: Lowlight — Slow Burn revisions',
+    preview: 'Hey Lauryn — loved the new bridge, just two notes on the second verse...',
+    date: '2026-05-04 14:22',
+    matchedTrackId: 't_002',
+    proposedStatus: 'needs_rev',
+    handled: false,
+  },
+  {
+    id: 'e_02',
+    from: 'briefs@extrememusic.com',
+    subject: 'Paper Skies — invoice received',
+    preview: 'This is to confirm we received invoice #2026-0042 for Paper Skies...',
+    date: '2026-05-03 09:11',
+    matchedTrackId: 't_003',
+    proposedField: { invoice: 'paid' },
+    handled: false,
+  },
+  {
+    id: 'e_03',
+    from: 'theo@northstar.fm',
+    subject: 'Compass — final approved',
+    preview: 'Approved on our end. Ready for delivery whenever you are.',
+    date: '2026-05-02 18:40',
+    matchedTrackId: 't_005',
+    proposedStatus: 'delivered',
+    handled: false,
+  },
+  {
+    id: 'e_04',
+    from: 'unknown@positionmusic.com',
+    subject: 'New brief — Hollow Coast season 2',
+    preview: 'Attaching the new brief, deadline tight on this one.',
+    date: '2026-05-01 11:05',
+    matchedTrackId: null,
+    proposedNew: true,
+    handled: false,
+  },
+];
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {
+    tracks: SEED_TRACKS,
+    inbox: SEED_INBOX,
+    statuses: DEFAULT_STATUSES,
+    codeFormat: DEFAULT_CODE_FORMAT,
+    folderTemplate: DEFAULT_FOLDER_TEMPLATE,
+  };
+}
+
+function saveState(s) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch (e) {}
+}
+
+function resetState() {
+  try { localStorage.removeItem(LS_KEY); } catch (e) {}
+}
+
+function applyCodeFormat(fmt, vars) {
+  return fmt.replace(/\{(\w+)\}/g, (_, k) => vars[k] || `{${k}}`);
+}
+
+function fmtMoney(n) {
+  if (n == null || n === '') return '—';
+  return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function statusById(statuses, id) {
+  return statuses.find((x) => x.id === id) || statuses[0];
+}
+
+Object.assign(window, {
+  loadState, saveState, resetState,
+  applyCodeFormat, fmtMoney, fmtDate, statusById,
+  DEFAULT_STATUSES, DEFAULT_CODE_FORMAT, DEFAULT_FOLDER_TEMPLATE,
+});
+
+</script>
+<script type="text/babel" data-presets="react" data-label="tracker-app">
+// tracker-app.jsx — main React app for the Library Tracker.
+// Renders the table view, detail drawer, brief uploader modal,
+// folder confirmation dialog, and email inbox panel.
+// Theme-aware: takes a `theme` prop ('paper' | 'console') and a
+// `tweaks` prop (color, density, statuses, codeFormat, folderTemplate).
+
+const { useState, useEffect, useMemo, useRef } = React;
+
+// ─────────────────────────────────────────────────────────────
+// THEMES — two distinct visual languages
+// ─────────────────────────────────────────────────────────────
+const THEMES = {
+  paper: {
+    bg: '#f4f1ea',
+    surface: '#fbf9f4',
+    surfaceAlt: '#efeae0',
+    border: 'rgba(40, 30, 20, 0.10)',
+    borderStrong: 'rgba(40, 30, 20, 0.18)',
+    ink: '#1f1b16',
+    inkSoft: '#5a5249',
+    inkMuted: '#8a8276',
+    accent: '#b8593a',
+    accentSoft: 'rgba(184, 89, 58, 0.12)',
+    rowHover: 'rgba(40, 30, 20, 0.04)',
+    rowActive: 'rgba(184, 89, 58, 0.08)',
+    sans: '"Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif',
+    mono: '"JetBrains Mono", "SF Mono", ui-monospace, monospace',
+    chrome: 'paper',
+  },
+  console: {
+    bg: '#0e0d0c',
+    surface: '#1a1816',
+    surfaceAlt: '#252220',
+    border: 'rgba(255, 240, 220, 0.08)',
+    borderStrong: 'rgba(255, 240, 220, 0.16)',
+    ink: '#f0ebe3',
+    inkSoft: '#a8a097',
+    inkMuted: '#6b6358',
+    accent: '#e89968',
+    accentSoft: 'rgba(232, 153, 104, 0.16)',
+    rowHover: 'rgba(255, 240, 220, 0.04)',
+    rowActive: 'rgba(232, 153, 104, 0.10)',
+    sans: '"Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif',
+    mono: '"JetBrains Mono", "SF Mono", ui-monospace, monospace',
+    chrome: 'console',
+  },
+};
+
+const INVOICE_STATES = [
+  { id: 'unpaid',   label: 'Unpaid',   dot: '#c44545' },
+  { id: 'invoiced', label: 'Invoiced', dot: '#c9a14a' },
+  { id: 'paid',     label: 'Paid',     dot: '#3d8a5f' },
+];
+
+// ─────────────────────────────────────────────────────────────
+// Tiny atoms
+// ─────────────────────────────────────────────────────────────
+function StatusPill({ status, theme, onClick, dense }) {
+  if (!status) return null;
+  const pad = dense ? '2px 8px' : '3px 10px';
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: pad, borderRadius: 999,
+        background: theme.surfaceAlt,
+        border: `1px solid ${theme.border}`,
+        color: theme.ink, fontSize: 11, fontWeight: 500,
+        fontFamily: theme.sans, cursor: onClick ? 'pointer' : 'default',
+        whiteSpace: 'nowrap', letterSpacing: 0.1,
+      }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: status.color }} />
+      {status.label}
+    </button>
+  );
+}
+
+function InvoicePill({ value, theme, dense }) {
+  const inv = INVOICE_STATES.find((x) => x.id === value) || INVOICE_STATES[0];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: dense ? '1px 7px' : '2px 9px',
+      borderRadius: 4,
+      background: 'transparent',
+      border: `1px solid ${theme.border}`,
+      color: theme.inkSoft, fontSize: 10.5, fontWeight: 500,
+      fontFamily: theme.sans, textTransform: 'uppercase', letterSpacing: 0.6,
+    }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: inv.dot }} />
+      {inv.label}
+    </span>
+  );
+}
+
+function IconBtn({ children, onClick, title, theme, active }) {
+  return (
+    <button onClick={onClick} title={title}
+      style={{
+        width: 28, height: 28, borderRadius: 6, border: 'none',
+        background: active ? theme.accentSoft : 'transparent',
+        color: active ? theme.accent : theme.inkSoft,
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background .12s, color .12s',
+      }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = theme.rowHover; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
+      {children}
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Table view
+// ─────────────────────────────────────────────────────────────
+function TrackTable({ tracks, statuses, theme, dense, sortKey, sortDir, onSort, selectedId, onSelect }) {
+  const cols = [
+    { key: 'code',      label: 'Project Code', flex: '0 0 280px', mono: true },
+    { key: 'title',     label: 'Track',        flex: '1 1 140px' },
+    { key: 'album',     label: 'Album',        flex: '0 0 140px' },
+    { key: 'status',    label: 'Status',       flex: '0 0 140px' },
+    { key: 'publisher', label: 'Publisher',    flex: '0 0 160px' },
+    { key: 'cost',      label: 'Fee',          flex: '0 0 80px',  align: 'right' },
+    { key: 'invoice',   label: 'Invoice',      flex: '0 0 96px' },
+    { key: 'due',       label: 'Due',          flex: '0 0 80px' },
+  ];
+
+  const rowH = dense ? 36 : 48;
+  const rowPad = dense ? '0 14px' : '0 18px';
+
+  return (
+    <div style={{ flex: 1, overflow: 'auto', background: theme.surface }}>
+      {/* sticky header */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 2,
+        display: 'flex', alignItems: 'center',
+        height: dense ? 32 : 38, padding: rowPad,
+        background: theme.surface,
+        borderBottom: `1px solid ${theme.borderStrong}`,
+        fontSize: 10.5, fontWeight: 600, letterSpacing: 0.8,
+        textTransform: 'uppercase', color: theme.inkMuted,
+        fontFamily: theme.sans,
+      }}>
+        {cols.map((c) => (
+          <div key={c.key}
+            onClick={() => onSort(c.key)}
+            style={{
+              flex: c.flex, paddingRight: 12, cursor: 'pointer',
+              textAlign: c.align || 'left',
+              display: 'flex', alignItems: 'center',
+              justifyContent: c.align === 'right' ? 'flex-end' : 'flex-start',
+              gap: 4,
+            }}>
+            {c.label}
+            {sortKey === c.key && (
+              <span style={{ opacity: 0.6, fontSize: 9 }}>{sortDir === 'asc' ? '↑' : '↓'}</span>
+            )}
+          </div>
+        ))}
+      </div>
+      {/* rows */}
+      {tracks.map((t) => {
+        const status = statusById(statuses, t.status);
+        const isSel = t.id === selectedId;
+        return (
+          <div key={t.id}
+            onClick={() => onSelect(t.id)}
+            style={{
+              display: 'flex', alignItems: 'center',
+              height: rowH, padding: rowPad,
+              borderBottom: `1px solid ${theme.border}`,
+              background: isSel ? theme.rowActive : 'transparent',
+              cursor: 'pointer',
+              fontFamily: theme.sans,
+              transition: 'background .1s',
+            }}
+            onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = theme.rowHover; }}
+            onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.background = 'transparent'; }}>
+            <div style={{ flex: cols[0].flex, paddingRight: 12, fontFamily: theme.mono, fontSize: 11.5, color: theme.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {t.code}
+            </div>
+            <div style={{ flex: cols[1].flex, paddingRight: 12, fontSize: 13, fontWeight: 500, color: theme.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {t.title}
+            </div>
+            <div style={{ flex: cols[2].flex, paddingRight: 12, fontSize: 12.5, color: theme.inkSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {t.album}
+            </div>
+            <div style={{ flex: cols[3].flex, paddingRight: 12 }}>
+              <StatusPill status={status} theme={theme} dense={dense} />
+            </div>
+            <div style={{ flex: cols[4].flex, paddingRight: 12, fontSize: 12.5, color: theme.inkSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {t.publisher}
+            </div>
+            <div style={{ flex: cols[5].flex, paddingRight: 12, textAlign: 'right', fontSize: 12.5, color: theme.ink, fontVariantNumeric: 'tabular-nums' }}>
+              {fmtMoney(t.cost)}
+            </div>
+            <div style={{ flex: cols[6].flex, paddingRight: 12 }}>
+              <InvoicePill value={t.invoice} theme={theme} dense={dense} />
+            </div>
+            <div style={{ flex: cols[7].flex, fontSize: 12.5, color: theme.inkSoft, fontVariantNumeric: 'tabular-nums' }}>
+              {fmtDate(t.due)}
+            </div>
+          </div>
+        );
+      })}
+      {tracks.length === 0 && (
+        <div style={{ padding: 60, textAlign: 'center', color: theme.inkMuted, fontSize: 13, fontFamily: theme.sans }}>
+          No tracks match this filter.
+        </div>
+      )}
+    </div>
+  );
+}
+
+Object.assign(window, { THEMES, INVOICE_STATES, StatusPill, InvoicePill, IconBtn, TrackTable });
+
+</script>
+<script type="text/babel" data-presets="react" data-label="tracker-modals">
+// tracker-modals.jsx — Drawer, BriefUploader, FolderConfirm, InboxPanel
+// Uses theme + helpers loaded onto window from tracker-app.jsx and data.jsx.
+
+const { useState: useStateM, useEffect: useEffectM, useMemo: useMemoM, useRef: useRefM } = React;
+
+// ─────────────────────────────────────────────────────────────
+// Detail Drawer — slides in from the right
+// ─────────────────────────────────────────────────────────────
+function TrackDrawer({ track, statuses, theme, onClose, onUpdate, onOpenFolder }) {
+  if (!track) return null;
+  const status = statusById(statuses, track.status);
+
+  const Field = ({ label, children }) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', color: theme.inkMuted, marginBottom: 5, fontFamily: theme.sans }}>{label}</div>
+      <div style={{ fontSize: 13, color: theme.ink, fontFamily: theme.sans }}>{children}</div>
+    </div>
+  );
+
+  const editText = (key, multiline) => {
+    const Tag = multiline ? 'textarea' : 'input';
+    return (
+      <Tag
+        defaultValue={track[key] || ''}
+        onBlur={(e) => onUpdate(track.id, { [key]: e.target.value })}
+        rows={multiline ? 3 : undefined}
+        style={{
+          width: '100%', background: theme.surfaceAlt,
+          border: `1px solid ${theme.border}`, borderRadius: 4,
+          padding: '6px 9px', fontSize: 13, color: theme.ink,
+          fontFamily: theme.sans, outline: 'none', resize: 'vertical',
+        }} />
+    );
+  };
+
+  return (
+    <div style={{
+      width: 380, flexShrink: 0,
+      borderLeft: `1px solid ${theme.borderStrong}`,
+      background: theme.surface,
+      display: 'flex', flexDirection: 'column',
+      fontFamily: theme.sans,
+    }}>
+      {/* header */}
+      <div style={{
+        padding: '14px 18px', borderBottom: `1px solid ${theme.border}`,
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: theme.mono, fontSize: 10.5, color: theme.inkMuted, marginBottom: 4, letterSpacing: 0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.code}</div>
+          <input
+            defaultValue={track.title}
+            onBlur={(e) => onUpdate(track.id, { title: e.target.value })}
+            style={{
+              fontSize: 19, fontWeight: 600, color: theme.ink, letterSpacing: -0.3,
+              border: 'none', background: 'transparent', outline: 'none',
+              padding: 0, width: '100%', fontFamily: theme.sans,
+            }} />
+        </div>
+        <button onClick={onClose} style={{
+          width: 26, height: 26, borderRadius: 6, border: 'none',
+          background: 'transparent', color: theme.inkSoft,
+          fontSize: 18, cursor: 'pointer', lineHeight: 1, flexShrink: 0,
+        }}>×</button>
+      </div>
+
+      {/* body */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 18px' }}>
+        <Field label="Status">
+          <select
+            value={track.status}
+            onChange={(e) => onUpdate(track.id, { status: e.target.value })}
+            style={{
+              width: '100%', background: theme.surfaceAlt,
+              border: `1px solid ${theme.border}`, borderRadius: 4,
+              padding: '6px 9px', fontSize: 13, color: theme.ink,
+              fontFamily: theme.sans, outline: 'none',
+            }}>
+            {statuses.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </Field>
+
+        <Field label="Album / Project">{editText('album')}</Field>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Publisher">{editText('publisher')}</Field>
+          <Field label="Due Date">
+            <input type="date" defaultValue={track.due}
+              onBlur={(e) => onUpdate(track.id, { due: e.target.value })}
+              style={{ width: '100%', background: theme.surfaceAlt, border: `1px solid ${theme.border}`, borderRadius: 4, padding: '6px 9px', fontSize: 13, color: theme.ink, fontFamily: theme.sans, outline: 'none' }} />
+          </Field>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Field label="Fee">
+            <input type="number" defaultValue={track.cost}
+              onBlur={(e) => onUpdate(track.id, { cost: Number(e.target.value) })}
+              style={{ width: '100%', background: theme.surfaceAlt, border: `1px solid ${theme.border}`, borderRadius: 4, padding: '6px 9px', fontSize: 13, color: theme.ink, fontFamily: theme.sans, outline: 'none' }} />
+          </Field>
+          <Field label="Invoice">
+            <select value={track.invoice}
+              onChange={(e) => onUpdate(track.id, { invoice: e.target.value })}
+              style={{ width: '100%', background: theme.surfaceAlt, border: `1px solid ${theme.border}`, borderRadius: 4, padding: '6px 9px', fontSize: 13, color: theme.ink, fontFamily: theme.sans, outline: 'none' }}>
+              {INVOICE_STATES.map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}
+            </select>
+          </Field>
+        </div>
+
+        <Field label="Collaborators">
+          <input
+            defaultValue={(track.collaborators || []).join(', ')}
+            onBlur={(e) => onUpdate(track.id, { collaborators: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+            style={{ width: '100%', background: theme.surfaceAlt, border: `1px solid ${theme.border}`, borderRadius: 4, padding: '6px 9px', fontSize: 13, color: theme.ink, fontFamily: theme.sans, outline: 'none' }} />
+        </Field>
+
+        <Field label="Brief">
+          <a href="#" onClick={(e) => e.preventDefault()} style={{ color: theme.accent, fontSize: 12.5, wordBreak: 'break-all', textDecoration: 'none', borderBottom: `1px dashed ${theme.accent}` }}>
+            {track.brief}
+          </a>
+        </Field>
+
+        <Field label="Local Folder">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: theme.surfaceAlt, borderRadius: 4, border: `1px solid ${theme.border}` }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke={theme.inkSoft} strokeWidth="1.4"><path d="M1 3.5C1 2.67 1.67 2 2.5 2H5l1.5 1.5h5C12.33 3.5 13 4.17 13 5v6c0 .83-.67 1.5-1.5 1.5h-9C1.67 12.5 1 11.83 1 11V3.5z"/></svg>
+            <span style={{ fontFamily: theme.mono, fontSize: 11, color: theme.inkSoft, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{track.folderPath}</span>
+            <button onClick={() => onOpenFolder(track)} style={{
+              border: 'none', background: 'transparent', color: theme.accent,
+              fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: theme.sans,
+            }}>Open</button>
+          </div>
+        </Field>
+
+        <Field label={`Email Activity · ${track.emails || 0} threads`}>
+          <div style={{ fontSize: 12, color: theme.inkSoft, lineHeight: 1.5 }}>
+            Last sync: 4 minutes ago · matched by subject keyword
+            <span style={{ fontFamily: theme.mono, color: theme.ink }}> "{track.album}"</span>
+          </div>
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Modal shell
+// ─────────────────────────────────────────────────────────────
+function Modal({ children, theme, onClose, width = 540 }) {
+  return (
+    <div onClick={onClose} style={{
+      position: 'absolute', inset: 0, zIndex: 50,
+      background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(2px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width, maxWidth: 'calc(100% - 60px)', maxHeight: 'calc(100% - 80px)',
+        background: theme.surface, borderRadius: 10,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px ' + theme.borderStrong,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        fontFamily: theme.sans,
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// BriefUploader — paste link / drop file → preview parsed fields
+// ─────────────────────────────────────────────────────────────
+function BriefUploader({ theme, onClose, onCreate, codeFormat }) {
+  const [step, setStep] = useStateM(1); // 1 = upload, 2 = parsed preview
+  const [briefSrc, setBriefSrc] = useStateM('');
+  const [parsing, setParsing] = useStateM(false);
+  const [parsed, setParsed] = useStateM(null);
+
+  const startParse = (src) => {
+    setBriefSrc(src);
+    setParsing(true);
+    setStep(2);
+    // Simulated parse: 1.2s "AI" delay, then propose fields
+    setTimeout(() => {
+      const albums = ['Hollow Coast', 'Nightlands', 'Quiet Frame', 'Riverstone', 'Echo Park'];
+      const titles = ['Undertow', 'Coast Road', 'Slow Light', 'Far Harbor', 'Blue Hour'];
+      const pubs   = ['Universal Production Music', 'APM Music', 'Extreme Music', 'Position Music'];
+      const album = albums[Math.floor(Math.random()*albums.length)];
+      const title = titles[Math.floor(Math.random()*titles.length)];
+      const pub   = pubs[Math.floor(Math.random()*pubs.length)];
+      const newCode = applyCodeFormat(codeFormat, { EP_TITLE: album, VERSION: '1.00', INITIALS: 'LL' });
+      const due = new Date(); due.setDate(due.getDate() + 14);
+      setParsed({
+        title, album, publisher: pub, version: '1.00', initials: 'LL',
+        cost: 2400, due: due.toISOString().slice(0,10),
+        code: newCode, brief: src,
+        keywords: ['cinematic', 'underscore', 'female vocal', '90 seconds', '120 BPM'],
+      });
+      setParsing(false);
+    }, 1200);
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f) startParse(f.name);
+  };
+
+  if (step === 1) {
+    return (
+      <Modal theme={theme} onClose={onClose} width={560}>
+        <div style={{ padding: '18px 22px', borderBottom: `1px solid ${theme.border}` }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: theme.ink, letterSpacing: -0.2 }}>New Project</div>
+          <div style={{ fontSize: 12, color: theme.inkSoft, marginTop: 2 }}>Drop a brief, paste a link, or upload a screenshot.</div>
+        </div>
+        <div style={{ padding: 22 }}>
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+            style={{
+              border: `1.5px dashed ${theme.borderStrong}`, borderRadius: 8,
+              padding: '36px 20px', textAlign: 'center', marginBottom: 14,
+              background: theme.surfaceAlt,
+            }}>
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke={theme.inkSoft} strokeWidth="1.4" style={{ margin: '0 auto 10px', display: 'block' }}>
+              <path d="M16 4v16M10 12l6-6 6 6M5 22v4a2 2 0 002 2h18a2 2 0 002-2v-4"/></svg>
+            <div style={{ fontSize: 13.5, fontWeight: 500, color: theme.ink, marginBottom: 4 }}>Drop a PDF or screenshot here</div>
+            <div style={{ fontSize: 12, color: theme.inkSoft }}>or <button onClick={() => startParse('brief-screenshot.png')} style={{ color: theme.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, padding: 0 }}>browse files</button></div>
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: theme.inkMuted, marginBottom: 6 }}>Or paste a link</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              placeholder="https://docs.google.com/… or notion.so/…"
+              onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value) startParse(e.target.value); }}
+              style={{
+                flex: 1, padding: '9px 11px', fontSize: 13,
+                background: theme.surfaceAlt, color: theme.ink,
+                border: `1px solid ${theme.border}`, borderRadius: 6,
+                outline: 'none', fontFamily: theme.sans,
+              }} />
+            <button
+              onClick={(e) => { const v = e.currentTarget.previousElementSibling.value; if (v) startParse(v); }}
+              style={{
+                padding: '0 16px', background: theme.accent, color: '#fff',
+                border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 13,
+                cursor: 'pointer', fontFamily: theme.sans,
+              }}>Parse</button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // Step 2 — parsed preview
+  return (
+    <Modal theme={theme} onClose={onClose} width={580}>
+      <div style={{ padding: '18px 22px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: theme.ink, letterSpacing: -0.2 }}>Confirm details</div>
+          <div style={{ fontSize: 12, color: theme.inkSoft, marginTop: 2, fontFamily: theme.mono }}>{briefSrc}</div>
+        </div>
+        {parsing && <div style={{ fontSize: 11.5, color: theme.accent, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: theme.accent, animation: 'pulse 1s infinite' }} />
+          Parsing brief…
+        </div>}
+      </div>
+
+      {parsing ? (
+        <div style={{ padding: 40, textAlign: 'center', color: theme.inkSoft, fontSize: 13 }}>
+          Reading the brief and proposing fields…
+        </div>
+      ) : parsed && (
+        <div style={{ padding: 22, overflow: 'auto' }}>
+          <div style={{ marginBottom: 16, padding: '10px 12px', background: theme.accentSoft, borderRadius: 6, border: `1px solid ${theme.accent}33` }}>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: theme.accent, marginBottom: 3 }}>Project Code</div>
+            <input defaultValue={parsed.code}
+              onChange={(e) => setParsed({ ...parsed, code: e.target.value })}
+              style={{ width: '100%', fontFamily: theme.mono, fontSize: 14, color: theme.ink, background: 'transparent', border: 'none', outline: 'none', padding: 0, fontWeight: 500 }} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <Labeled theme={theme} label="Track Title" value={parsed.title} onChange={(v) => setParsed({ ...parsed, title: v })} />
+            <Labeled theme={theme} label="Album / Project" value={parsed.album} onChange={(v) => setParsed({ ...parsed, album: v })} />
+            <Labeled theme={theme} label="Publisher" value={parsed.publisher} onChange={(v) => setParsed({ ...parsed, publisher: v })} />
+            <Labeled theme={theme} label="Fee" value={parsed.cost} onChange={(v) => setParsed({ ...parsed, cost: Number(v) })} type="number" />
+            <Labeled theme={theme} label="Version" value={parsed.version} onChange={(v) => setParsed({ ...parsed, version: v })} />
+            <Labeled theme={theme} label="Due" value={parsed.due} onChange={(v) => setParsed({ ...parsed, due: v })} type="date" />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: theme.inkMuted, marginBottom: 6 }}>Detected Keywords</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {parsed.keywords.map((k) => (
+                <span key={k} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: theme.surfaceAlt, color: theme.inkSoft, border: `1px solid ${theme.border}` }}>{k}</span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 12, borderTop: `1px solid ${theme.border}` }}>
+            <button onClick={onClose} style={{
+              padding: '8px 16px', background: 'transparent', color: theme.inkSoft,
+              border: `1px solid ${theme.border}`, borderRadius: 6, fontSize: 13,
+              cursor: 'pointer', fontFamily: theme.sans, fontWeight: 500,
+            }}>Cancel</button>
+            <button onClick={() => onCreate(parsed)} style={{
+              padding: '8px 16px', background: theme.accent, color: '#fff',
+              border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', fontFamily: theme.sans,
+            }}>Continue → Folder Setup</button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function Labeled({ theme, label, value, onChange, type = 'text' }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: theme.inkMuted, marginBottom: 4 }}>{label}</div>
+      <input type={type} defaultValue={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: '100%', padding: '7px 10px', fontSize: 13, background: theme.surfaceAlt, color: theme.ink, border: `1px solid ${theme.border}`, borderRadius: 5, outline: 'none', fontFamily: theme.sans }} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// FolderConfirm — preview the folder structure before creating
+// ─────────────────────────────────────────────────────────────
+function FolderConfirm({ theme, parsed, folderTemplate, onClose, onConfirm }) {
+  const [template, setTemplate] = useStateM(folderTemplate);
+  const root = parsed.code;
+
+  const addFolder = () => {
+    const name = prompt('New folder name:');
+    if (name) setTemplate([...template, { name, children: [] }]);
+  };
+  const removeFolder = (i) => setTemplate(template.filter((_, idx) => idx !== i));
+
+  return (
+    <Modal theme={theme} onClose={onClose} width={520}>
+      <div style={{ padding: '18px 22px', borderBottom: `1px solid ${theme.border}` }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: theme.ink, letterSpacing: -0.2 }}>Create folder on Desktop</div>
+        <div style={{ fontSize: 12, color: theme.inkSoft, marginTop: 2 }}>Adjust before confirming. This becomes the default for next time.</div>
+      </div>
+      <div style={{ padding: 22, overflow: 'auto' }}>
+        <div style={{ fontFamily: theme.mono, fontSize: 12, color: theme.inkSoft, marginBottom: 8 }}>~/Desktop/DCD/{parsed.album}/</div>
+        <div style={{ background: theme.surfaceAlt, border: `1px solid ${theme.border}`, borderRadius: 6, padding: '10px 14px', fontFamily: theme.mono, fontSize: 12.5 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: theme.ink, fontWeight: 600, marginBottom: 6 }}>
+            <span style={{ color: theme.accent }}>▾</span> 📁 {root}
+          </div>
+          {template.map((f, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 22, marginBottom: 4, color: theme.ink }}>
+              <span style={{ color: theme.inkMuted }}>└</span>
+              <span>📁</span>
+              <input defaultValue={f.name} onBlur={(e) => {
+                const next = [...template]; next[i] = { ...next[i], name: e.target.value }; setTemplate(next);
+              }} style={{ flex: 1, background: 'transparent', border: 'none', color: theme.ink, fontFamily: theme.mono, fontSize: 12.5, outline: 'none', padding: 0 }} />
+              <button onClick={() => removeFolder(i)} style={{ background: 'none', border: 'none', color: theme.inkMuted, cursor: 'pointer', fontSize: 13, padding: '0 4px' }}>×</button>
+            </div>
+          ))}
+          <button onClick={addFolder} style={{ marginTop: 4, marginLeft: 22, background: 'none', border: 'none', color: theme.accent, fontSize: 11.5, cursor: 'pointer', fontFamily: theme.sans, fontWeight: 600, padding: 0 }}>+ Add folder</button>
+        </div>
+
+        <div style={{ marginTop: 14, padding: '10px 12px', background: theme.accentSoft, borderRadius: 6, fontSize: 11.5, color: theme.ink, lineHeight: 1.5 }}>
+          <strong style={{ color: theme.accent }}>Sync:</strong> folder will be watched. New files in <span style={{ fontFamily: theme.mono }}>DEMO 2MXS</span> auto-attach to this project across your devices.
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18, paddingTop: 14, borderTop: `1px solid ${theme.border}` }}>
+          <button onClick={onClose} style={{
+            padding: '8px 16px', background: 'transparent', color: theme.inkSoft,
+            border: `1px solid ${theme.border}`, borderRadius: 6, fontSize: 13,
+            cursor: 'pointer', fontFamily: theme.sans, fontWeight: 500,
+          }}>Back</button>
+          <button onClick={() => onConfirm(template)} style={{
+            padding: '8px 16px', background: theme.accent, color: '#fff',
+            border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', fontFamily: theme.sans,
+          }}>Create folder & project</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// InboxPanel — slide-down email matches with Approve / Dismiss
+// ─────────────────────────────────────────────────────────────
+function InboxPanel({ theme, inbox, tracks, statuses, onApprove, onDismiss, onClose }) {
+  const pending = inbox.filter((e) => !e.handled);
+
+  return (
+    <div style={{
+      position: 'absolute', top: 0, right: 0, width: 380, bottom: 0, zIndex: 40,
+      background: theme.surface, borderLeft: `1px solid ${theme.borderStrong}`,
+      boxShadow: '-12px 0 32px rgba(0,0,0,0.18)',
+      display: 'flex', flexDirection: 'column', fontFamily: theme.sans,
+    }}>
+      <div style={{ padding: '14px 18px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: theme.ink }}>Inbox</div>
+          <div style={{ fontSize: 11.5, color: theme.inkSoft, marginTop: 2 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3d8a5f' }} />
+              Connected · gmail.com
+            </span>
+          </div>
+        </div>
+        <button onClick={onClose} style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: 'transparent', color: theme.inkSoft, fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
+      </div>
+
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {pending.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: theme.inkMuted, fontSize: 13 }}>Inbox clear ✓</div>
+        ) : pending.map((e) => {
+          const matched = tracks.find((t) => t.id === e.matchedTrackId);
+          const proposedStatus = e.proposedStatus && statusById(statuses, e.proposedStatus);
+          return (
+            <div key={e.id} style={{ padding: '14px 18px', borderBottom: `1px solid ${theme.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: theme.ink }}>{e.from}</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: 10.5, color: theme.inkMuted, fontVariantNumeric: 'tabular-nums' }}>{e.date.slice(5)}</span>
+              </div>
+              <div style={{ fontSize: 13, color: theme.ink, marginBottom: 4, fontWeight: 500 }}>{e.subject}</div>
+              <div style={{ fontSize: 11.5, color: theme.inkSoft, marginBottom: 10, lineHeight: 1.5 }}>{e.preview}</div>
+
+              {matched && (
+                <div style={{ background: theme.surfaceAlt, borderRadius: 5, padding: '8px 10px', marginBottom: 8, fontSize: 11 }}>
+                  <div style={{ color: theme.inkMuted, marginBottom: 2 }}>Matched →</div>
+                  <div style={{ fontFamily: theme.mono, color: theme.ink }}>{matched.code}</div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: theme.inkSoft, marginBottom: 10 }}>
+                {e.proposedNew && <span>📎 Proposing: <strong style={{ color: theme.accent }}>create new project</strong></span>}
+                {proposedStatus && <span>Proposing: <strong style={{ color: theme.ink }}>{proposedStatus.label}</strong></span>}
+                {e.proposedField && <span>Proposing: <strong style={{ color: theme.ink }}>mark {e.proposedField.invoice}</strong></span>}
+              </div>
+
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => onApprove(e)} style={{
+                  flex: 1, padding: '6px 10px', background: theme.accent, color: '#fff',
+                  border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: theme.sans,
+                }}>Approve</button>
+                <button onClick={() => onDismiss(e.id)} style={{
+                  padding: '6px 12px', background: 'transparent', color: theme.inkSoft,
+                  border: `1px solid ${theme.border}`, borderRadius: 5, fontSize: 12,
+                  cursor: 'pointer', fontFamily: theme.sans,
+                }}>Dismiss</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { TrackDrawer, BriefUploader, FolderConfirm, InboxPanel });
+
+</script>
+<script type="text/babel" data-presets="react" data-label="tracker-shell">
+// tracker-shell.jsx — top-level App shell. Wires state, toolbar, table, drawer,
+// modals, and inbox panel into one component. Exposed as window.TrackerApp({theme, tweaks}).
+
+const { useState: useStateS, useEffect: useEffectS, useMemo: useMemoS, useRef: useRefS } = React;
+
+function TrackerApp({ theme, tweaks, scoped }) {
+  // tweaks may override the active theme key; keep theme prop authoritative.
+  const T = THEMES[theme] || THEMES.paper;
+  const dense = tweaks?.density === 'compact';
+
+  // ── core state, persisted to localStorage (shared across both variants) ──
+  const [state, setState] = useStateS(() => loadState());
+  useEffectS(() => { saveState(state); }, [state]);
+
+  // tweak overrides override state.statuses / codeFormat / folderTemplate
+  const statuses = tweaks?.statuses || state.statuses;
+  const codeFormat = tweaks?.codeFormat || state.codeFormat;
+  const folderTemplate = tweaks?.folderTemplate || state.folderTemplate;
+
+  // ── UI state ──
+  const [selectedId, setSelectedId] = useStateS(null);
+  const [search, setSearch] = useStateS('');
+  const [filterStatus, setFilterStatus] = useStateS('all');
+  const [filterInvoice, setFilterInvoice] = useStateS('all');
+  const [sortKey, setSortKey] = useStateS('due');
+  const [sortDir, setSortDir] = useStateS('asc');
+  const [showInbox, setShowInbox] = useStateS(false);
+  const [showUpload, setShowUpload] = useStateS(false);
+  const [pendingFolder, setPendingFolder] = useStateS(null);
+  const [toast, setToast] = useStateS(null);
+
+  // ── derived ──
+  const filtered = useMemoS(() => {
+    let list = state.tracks.slice();
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((t) => (t.code + ' ' + t.title + ' ' + t.album + ' ' + t.publisher).toLowerCase().includes(q));
+    }
+    if (filterStatus !== 'all') list = list.filter((t) => t.status === filterStatus);
+    if (filterInvoice !== 'all') list = list.filter((t) => t.invoice === filterInvoice);
+    list.sort((a, b) => {
+      let av = a[sortKey], bv = b[sortKey];
+      if (sortKey === 'cost') { av = +av || 0; bv = +bv || 0; }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [state.tracks, search, filterStatus, filterInvoice, sortKey, sortDir]);
+
+  const selected = state.tracks.find((t) => t.id === selectedId);
+  const pendingInbox = state.inbox.filter((e) => !e.handled).length;
+
+  // ── handlers ──
+  const onSort = (k) => {
+    if (sortKey === k) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(k); setSortDir('asc'); }
+  };
+  const updateTrack = (id, patch) => {
+    setState((s) => ({ ...s, tracks: s.tracks.map((t) => t.id === id ? { ...t, ...patch } : t) }));
+  };
+  const showToast = (msg) => {
+    setToast(msg); setTimeout(() => setToast(null), 2400);
+  };
+  const onCreateFromBrief = (parsed) => {
+    setShowUpload(false);
+    setPendingFolder(parsed);
+  };
+  const onConfirmFolder = (template) => {
+    const p = pendingFolder;
+    const id = 't_' + Math.random().toString(36).slice(2, 8);
+    const folderPath = `~/Desktop/DCD/${p.album}/${p.code}`;
+    const newTrack = {
+      id, code: p.code, title: p.title, album: p.album,
+      initials: p.initials, version: p.version, status: 'brief',
+      publisher: p.publisher, cost: p.cost, invoice: 'unpaid',
+      due: p.due, brief: p.brief,
+      collaborators: ['Lauryn L.'], folderPath,
+      created: new Date().toISOString().slice(0,10), emails: 0,
+    };
+    setState((s) => ({ ...s, tracks: [newTrack, ...s.tracks], folderTemplate: template }));
+    setPendingFolder(null);
+    setSelectedId(id);
+    showToast(`Folder created at ${folderPath}`);
+  };
+  const onApproveEmail = (e) => {
+    setState((s) => {
+      let next = { ...s, inbox: s.inbox.map((x) => x.id === e.id ? { ...x, handled: true } : x) };
+      if (e.proposedStatus && e.matchedTrackId) {
+        next.tracks = next.tracks.map((t) => t.id === e.matchedTrackId ? { ...t, status: e.proposedStatus, emails: (t.emails||0)+1 } : t);
+      }
+      if (e.proposedField && e.matchedTrackId) {
+        next.tracks = next.tracks.map((t) => t.id === e.matchedTrackId ? { ...t, ...e.proposedField, emails: (t.emails||0)+1 } : t);
+      }
+      return next;
+    });
+    showToast('Updated from email');
+  };
+  const onDismissEmail = (id) => {
+    setState((s) => ({ ...s, inbox: s.inbox.map((x) => x.id === id ? { ...x, handled: true } : x) }));
+  };
+  const onOpenFolder = (track) => {
+    showToast(`Opening ${track.folderPath} in Finder…`);
+  };
+
+  // ── chrome variants ──
+  const Chrome = T.chrome === 'paper' ? PaperChrome : ConsoleChrome;
+
+  return (
+    <div style={{
+      width: '100%', height: '100%', position: 'relative',
+      background: T.bg, color: T.ink, fontFamily: T.sans,
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
+      <Chrome theme={T}
+        search={search} setSearch={setSearch}
+        filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+        filterInvoice={filterInvoice} setFilterInvoice={setFilterInvoice}
+        statuses={statuses}
+        tracks={state.tracks}
+        pendingInbox={pendingInbox}
+        showInbox={showInbox} setShowInbox={setShowInbox}
+        onUpload={() => setShowUpload(true)} />
+
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <TrackTable
+            tracks={filtered} statuses={statuses} theme={T} dense={dense}
+            sortKey={sortKey} sortDir={sortDir} onSort={onSort}
+            selectedId={selectedId} onSelect={setSelectedId} />
+        </div>
+        {selected && (
+          <TrackDrawer
+            track={selected} statuses={statuses} theme={T}
+            onClose={() => setSelectedId(null)}
+            onUpdate={updateTrack}
+            onOpenFolder={onOpenFolder} />
+        )}
+        {showInbox && (
+          <InboxPanel
+            theme={T} inbox={state.inbox} tracks={state.tracks} statuses={statuses}
+            onApprove={onApproveEmail} onDismiss={onDismissEmail}
+            onClose={() => setShowInbox(false)} />
+        )}
+      </div>
+
+      {/* status bar */}
+      <StatusBar theme={T} tracks={state.tracks} statuses={statuses} />
+
+      {showUpload && (
+        <BriefUploader theme={T} codeFormat={codeFormat}
+          onClose={() => setShowUpload(false)} onCreate={onCreateFromBrief} />
+      )}
+      {pendingFolder && (
+        <FolderConfirm theme={T} parsed={pendingFolder} folderTemplate={folderTemplate}
+          onClose={() => setPendingFolder(null)} onConfirm={onConfirmFolder} />
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'absolute', bottom: 36, left: '50%', transform: 'translateX(-50%)',
+          padding: '10px 16px', borderRadius: 6, fontSize: 12.5, fontWeight: 500,
+          background: T.ink, color: T.bg, fontFamily: T.sans,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.2)', zIndex: 60,
+          maxWidth: '80%',
+        }}>{toast}</div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// PaperChrome — warm, editorial top bar
+// ─────────────────────────────────────────────────────────────
+function PaperChrome({ theme: T, search, setSearch, filterStatus, setFilterStatus, filterInvoice, setFilterInvoice, statuses, tracks, pendingInbox, showInbox, setShowInbox, onUpload }) {
+  return (
+    <>
+      {/* brand bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        padding: '14px 22px 10px',
+        borderBottom: `1px solid ${T.border}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.4, color: T.ink }}>Library</div>
+          <div style={{ fontSize: 11, color: T.inkMuted, fontFamily: T.mono, letterSpacing: 0.4 }}>LL · {tracks.length} projects</div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setShowInbox(!showInbox)} style={{
+          position: 'relative', padding: '7px 12px', background: showInbox ? T.accentSoft : 'transparent',
+          color: showInbox ? T.accent : T.inkSoft, border: `1px solid ${T.border}`, borderRadius: 6,
+          fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: T.sans,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M2 4l4.5 3.5L11 4M2 3h9v7H2z"/></svg>
+          Inbox
+          {pendingInbox > 0 && <span style={{
+            position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, padding: '0 4px',
+            borderRadius: 8, background: T.accent, color: '#fff', fontSize: 10, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>{pendingInbox}</span>}
+        </button>
+        <button onClick={onUpload} style={{
+          padding: '7px 14px', background: T.accent, color: '#fff', border: 'none',
+          borderRadius: 6, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: T.sans,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5.5 1v9M1 5.5h9"/></svg>
+          New from Brief
+        </button>
+      </div>
+
+      {/* filter bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 22px', borderBottom: `1px solid ${T.borderStrong}`,
+        background: T.surface,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 9px', background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: 5, flex: '0 0 240px' }}>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke={T.inkMuted} strokeWidth="1.5"><circle cx="4.5" cy="4.5" r="3.5"/><path d="M7 7l3 3" strokeLinecap="round"/></svg>
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search code, title, publisher…"
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: T.ink, fontFamily: T.sans }} />
+        </div>
+        <FilterChip theme={T} value={filterStatus} onChange={setFilterStatus}
+          options={[{ id: 'all', label: 'All statuses' }, ...statuses]} />
+        <FilterChip theme={T} value={filterInvoice} onChange={setFilterInvoice}
+          options={[{ id: 'all', label: 'All invoices' }, ...INVOICE_STATES]} />
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 11, color: T.inkMuted, fontFamily: T.mono }}>auto-sync · 4m ago</span>
+      </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// ConsoleChrome — dark, DAW-ish bar with monospace stats
+// ─────────────────────────────────────────────────────────────
+function ConsoleChrome({ theme: T, search, setSearch, filterStatus, setFilterStatus, filterInvoice, setFilterInvoice, statuses, tracks, pendingInbox, showInbox, setShowInbox, onUpload }) {
+  const totals = useMemoS(() => {
+    const owed = tracks.filter((t) => t.invoice !== 'paid').reduce((s, t) => s + (+t.cost || 0), 0);
+    const active = tracks.filter((t) => !['delivered','rejected'].includes(t.status)).length;
+    return { owed, active };
+  }, [tracks]);
+
+  return (
+    <>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 16,
+        padding: '12px 22px', background: '#000', color: T.ink,
+        borderBottom: `1px solid ${T.borderStrong}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 22, height: 22, borderRadius: 4,
+            background: T.accent, color: '#000',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 800, letterSpacing: -0.3,
+            fontFamily: T.mono,
+          }}>L</div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, letterSpacing: 0.4, fontFamily: T.mono, textTransform: 'uppercase' }}>Library/Tracker</div>
+          <div style={{ width: 1, height: 14, background: T.border }} />
+          <div style={{ fontSize: 11, color: T.inkSoft, fontFamily: T.mono }}>
+            <span style={{ color: T.ink }}>{totals.active}</span> active · <span style={{ color: T.accent }}>{fmtMoney(totals.owed)}</span> outstanding
+          </div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setShowInbox(!showInbox)} style={{
+          position: 'relative', padding: '6px 11px',
+          background: showInbox ? T.accentSoft : 'transparent', color: showInbox ? T.accent : T.inkSoft,
+          border: `1px solid ${T.border}`, borderRadius: 4,
+          fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: T.mono,
+          textTransform: 'uppercase', letterSpacing: 0.5,
+        }}>
+          INBOX{pendingInbox > 0 && <span style={{ marginLeft: 8, color: T.accent }}>[{pendingInbox}]</span>}
+        </button>
+        <button onClick={onUpload} style={{
+          padding: '6px 12px', background: T.accent, color: '#000', border: 'none',
+          borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: T.mono,
+          textTransform: 'uppercase', letterSpacing: 0.6,
+        }}>+ NEW PROJECT</button>
+      </div>
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 22px', background: T.surface,
+        borderBottom: `1px solid ${T.borderStrong}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 9px', background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: 4, flex: '0 0 240px' }}>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke={T.inkMuted} strokeWidth="1.5"><circle cx="4.5" cy="4.5" r="3.5"/><path d="M7 7l3 3" strokeLinecap="round"/></svg>
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="search…"
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 12, color: T.ink, fontFamily: T.mono }} />
+          <kbd style={{ fontSize: 9.5, color: T.inkMuted, fontFamily: T.mono, padding: '1px 4px', border: `1px solid ${T.border}`, borderRadius: 3 }}>⌘K</kbd>
+        </div>
+        <FilterChip theme={T} value={filterStatus} onChange={setFilterStatus}
+          options={[{ id: 'all', label: 'STATUS · ALL' }, ...statuses]} mono />
+        <FilterChip theme={T} value={filterInvoice} onChange={setFilterInvoice}
+          options={[{ id: 'all', label: 'INVOICE · ALL' }, ...INVOICE_STATES]} mono />
+      </div>
+    </>
+  );
+}
+
+function FilterChip({ theme: T, value, onChange, options, mono }) {
+  const active = value !== 'all';
+  return (
+    <div style={{ position: 'relative' }}>
+      <select value={value} onChange={(e) => onChange(e.target.value)}
+        style={{
+          appearance: 'none', WebkitAppearance: 'none',
+          padding: '5px 24px 5px 10px', fontSize: mono ? 10.5 : 12,
+          background: active ? T.accentSoft : T.surfaceAlt,
+          color: active ? T.accent : T.inkSoft,
+          border: `1px solid ${active ? T.accent + '55' : T.border}`,
+          borderRadius: mono ? 4 : 5, outline: 'none',
+          fontFamily: mono ? T.mono : T.sans,
+          fontWeight: 500, cursor: 'pointer',
+          textTransform: mono ? 'uppercase' : 'none',
+          letterSpacing: mono ? 0.5 : 0,
+        }}>
+        {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+      </select>
+      <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', fontSize: 8, color: T.inkMuted }}>▼</span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// StatusBar — bottom bar with totals
+// ─────────────────────────────────────────────────────────────
+function StatusBar({ theme: T, tracks, statuses }) {
+  const stats = useMemoS(() => {
+    const total = tracks.reduce((s, t) => s + (+t.cost || 0), 0);
+    const paid = tracks.filter((t) => t.invoice === 'paid').reduce((s, t) => s + (+t.cost || 0), 0);
+    const owed = total - paid;
+    const active = tracks.filter((t) => !['delivered','rejected'].includes(t.status)).length;
+    return { total, paid, owed, active };
+  }, [tracks]);
+  const isConsole = T.chrome === 'console';
+  return (
+    <div style={{
+      flexShrink: 0, padding: '6px 22px',
+      borderTop: `1px solid ${T.borderStrong}`,
+      background: isConsole ? '#000' : T.surface,
+      display: 'flex', alignItems: 'center', gap: 18,
+      fontSize: 10.5, fontFamily: T.mono, color: T.inkMuted,
+      textTransform: 'uppercase', letterSpacing: 0.6,
+    }}>
+      <span><span style={{ color: T.ink }}>{stats.active}</span> active</span>
+      <span>·</span>
+      <span>billed <span style={{ color: T.ink, textTransform: 'none' }}>{fmtMoney(stats.total)}</span></span>
+      <span>·</span>
+      <span>paid <span style={{ color: '#3d8a5f', textTransform: 'none' }}>{fmtMoney(stats.paid)}</span></span>
+      <span>·</span>
+      <span>outstanding <span style={{ color: T.accent, textTransform: 'none' }}>{fmtMoney(stats.owed)}</span></span>
+      <span style={{ flex: 1 }} />
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3d8a5f' }} />
+        Synced · iCloud
+      </span>
+    </div>
+  );
+}
+
+// global pulse keyframe
+if (!document.getElementById('tracker-anims')) {
+  const s = document.createElement('style');
+  s.id = 'tracker-anims';
+  s.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}';
+  document.head.appendChild(s);
+}
+
+Object.assign(window, { TrackerApp });
+
+</script>
+
+<!-- root -->
+<script type="text/babel" data-presets="react" data-label="root">
+// Pull globals exported by the other Babel scripts (each script gets its own scope).
+const { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakText, TweakButton } = window;
+const { DesignCanvas, DCSection, DCArtboard, DCPostIt } = window;
+const { TrackerApp, THEMES, DEFAULT_STATUSES, resetState } = window;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "activeVariant": "paper",
+  "density": "comfortable",
+  "accent": "#b8593a",
+  "codePattern": "DCD {EP_TITLE} v{VERSION} {INITIALS} 2mx",
+  "extraStatuses": ""
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // build merged tweak object for the app
+  const merged = React.useMemo(() => {
+    const m = { density: tweaks.density, codeFormat: tweaks.codePattern };
+    // accent color override
+    if (tweaks.accent) {
+      THEMES.paper.accent = tweaks.accent;
+      THEMES.paper.accentSoft = tweaks.accent + '20';
+      THEMES.console.accent = tweaks.accent;
+      THEMES.console.accentSoft = tweaks.accent + '28';
+    }
+    // extra statuses (comma-sep): prepended with default colors
+    if (tweaks.extraStatuses && tweaks.extraStatuses.trim()) {
+      const extra = tweaks.extraStatuses.split(',').map((s) => s.trim()).filter(Boolean).map((label, i) => ({
+        id: 'custom_' + i, label, color: ['#7a6cad','#5a8a8a','#a86b4d'][i % 3],
+      }));
+      m.statuses = [...DEFAULT_STATUSES, ...extra];
+    }
+    return m;
+  }, [tweaks.density, tweaks.codePattern, tweaks.extraStatuses, tweaks.accent]);
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="overview" title="Library Tracker"
+          subtitle="Two takes. Same data. Same flows. Pick one (or mix).">
+          <DCArtboard id="paper" label="A · Warm Paper" width={1280} height={840}>
+            <TrackerApp theme="paper" tweaks={merged} />
+          </DCArtboard>
+          <DCArtboard id="console" label="B · Studio Console" width={1280} height={840}>
+            <TrackerApp theme="console" tweaks={merged} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="flow" title="Brief → Folder Flow"
+          subtitle="The four moments of starting a new project.">
+          <DCArtboard id="step1" label="① Drop brief" width={560} height={460}>
+            <FlowFrame theme={THEMES.paper} step={1} />
+          </DCArtboard>
+          <DCArtboard id="step2" label="② Confirm parsed details" width={560} height={460}>
+            <FlowFrame theme={THEMES.paper} step={2} />
+          </DCArtboard>
+          <DCArtboard id="step3" label="③ Approve folder structure" width={560} height={460}>
+            <FlowFrame theme={THEMES.paper} step={3} />
+          </DCArtboard>
+          <DCArtboard id="step4" label="④ Inbox auto-updates" width={560} height={460}>
+            <FlowFrame theme={THEMES.paper} step={4} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCPostIt top={120} left={2620} rotate={-3}>
+          Try it: click "+ New from Brief" on either variant, paste anything, and follow the flow.
+        </DCPostIt>
+        <DCPostIt top={620} right={60} rotate={2}>
+          Open the Tweaks panel (toolbar) to swap density, accent color, and the project-code pattern live.
+        </DCPostIt>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Layout">
+          <TweakRadio label="Density" value={tweaks.density}
+            onChange={(v) => setTweak('density', v)}
+            options={[{ value: 'comfortable', label: 'Comfortable' }, { value: 'compact', label: 'Compact' }]} />
+        </TweakSection>
+        <TweakSection title="Theme">
+          <TweakColor label="Accent color" value={tweaks.accent}
+            onChange={(v) => setTweak('accent', v)}
+            options={['#b8593a', '#3d6b8a', '#5a7a4d', '#8a4d6b']} />
+        </TweakSection>
+        <TweakSection title="Code format">
+          <TweakText label="Pattern" value={tweaks.codePattern}
+            onChange={(v) => setTweak('codePattern', v)} />
+          <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.5)', marginTop: 4, lineHeight: 1.5 }}>
+            Variables: <code>{'{EP_TITLE}'}</code> <code>{'{VERSION}'}</code> <code>{'{INITIALS}'}</code>
+          </div>
+        </TweakSection>
+        <TweakSection title="Status pipeline">
+          <TweakText label="Add custom statuses" value={tweaks.extraStatuses}
+            onChange={(v) => setTweak('extraStatuses', v)} />
+          <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.5)', marginTop: 4 }}>
+            Comma-separated. e.g. <code>"Synced to dropbox, Waiting on stems"</code>
+          </div>
+        </TweakSection>
+        <TweakSection title="Reset">
+          <TweakButton label="Reset all data" onClick={() => { resetState(); location.reload(); }} />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+// ─── Flow storyboard frames (static visual recap of the 4 steps) ───
+function FlowFrame({ theme: T, step }) {
+  const wrap = { width: '100%', height: '100%', background: T.bg, padding: 28, fontFamily: T.sans, color: T.ink, position: 'relative', overflow: 'hidden' };
+  if (step === 1) return (
+    <div style={wrap}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: T.inkMuted, marginBottom: 8 }}>STEP 1 · Drop a brief</div>
+      <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4, marginBottom: 22, lineHeight: 1.2 }}>Drag a PDF, screenshot,<br/>or paste a Google Doc link.</div>
+      <div style={{ border: `1.5px dashed ${T.borderStrong}`, borderRadius: 10, padding: 36, textAlign: 'center', background: T.surface }}>
+        <svg width="40" height="40" viewBox="0 0 32 32" fill="none" stroke={T.inkSoft} strokeWidth="1.4" style={{ margin: '0 auto 12px', display: 'block' }}>
+          <path d="M16 4v16M10 12l6-6 6 6M5 22v4a2 2 0 002 2h18a2 2 0 002-2v-4"/></svg>
+        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>Drop brief here</div>
+        <div style={{ fontSize: 12, color: T.inkSoft }}>PDF · PNG · JPG · link</div>
+      </div>
+      <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 16, fontFamily: T.mono }}>↳ AI reads it in ~1 second</div>
+    </div>
+  );
+  if (step === 2) return (
+    <div style={wrap}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: T.inkMuted, marginBottom: 8 }}>STEP 2 · Confirm parsed</div>
+      <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4, marginBottom: 18, lineHeight: 1.2 }}>Suggested fields, all editable.</div>
+      <div style={{ background: T.accentSoft, border: `1px solid ${T.accent}33`, borderRadius: 6, padding: '10px 12px', marginBottom: 12 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: T.accent, marginBottom: 3 }}>Project Code</div>
+        <div style={{ fontFamily: T.mono, fontSize: 14, fontWeight: 500 }}>DCD Hollow Coast v1.00 LL 2mx</div>
+      </div>
+      {[['Track Title', 'Tide Pull'], ['Album', 'Hollow Coast'], ['Publisher', 'Position Music'], ['Fee', '$2,400']].map(([l, v]) => (
+        <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${T.border}`, fontSize: 12.5 }}>
+          <span style={{ color: T.inkMuted }}>{l}</span>
+          <span style={{ color: T.ink, fontWeight: 500 }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+  if (step === 3) return (
+    <div style={wrap}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: T.inkMuted, marginBottom: 8 }}>STEP 3 · Folder structure</div>
+      <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4, marginBottom: 18, lineHeight: 1.2 }}>Created on your Desktop.</div>
+      <div style={{ fontFamily: T.mono, fontSize: 11, color: T.inkSoft, marginBottom: 6 }}>~/Desktop/DCD/Hollow Coast/</div>
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, padding: 14, fontFamily: T.mono, fontSize: 13 }}>
+        <div style={{ marginBottom: 6 }}><span style={{ color: T.accent }}>▾</span> 📁 DCD Hollow Coast v1.00 LL 2mx</div>
+        <div style={{ paddingLeft: 22, color: T.ink }}>└ 📁 TRACK</div>
+        <div style={{ paddingLeft: 22, color: T.ink }}>└ 📁 DEMO 2MXS</div>
+      </div>
+      <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 14, fontFamily: T.mono }}>↳ syncs to iCloud · drag to add subfolders</div>
+    </div>
+  );
+  // step 4
+  return (
+    <div style={wrap}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: T.inkMuted, marginBottom: 8 }}>STEP 4 · Inbox watches</div>
+      <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4, marginBottom: 18, lineHeight: 1.2 }}>Email moves the project<br/>forward — you just approve.</div>
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, padding: 14, marginBottom: 12 }}>
+        <div style={{ fontSize: 11.5, color: T.inkMuted, marginBottom: 4 }}>sarah@apmmusic.com · 2:22pm</div>
+        <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Re: Slow Burn revisions</div>
+        <div style={{ fontSize: 11.5, color: T.inkSoft, lineHeight: 1.5, marginBottom: 10 }}>"Two notes on the second verse..."</div>
+        <div style={{ background: T.accentSoft, padding: '6px 10px', borderRadius: 4, fontSize: 11, color: T.ink, marginBottom: 8 }}>
+          Proposing: <strong>Needs revision</strong> on <span style={{ fontFamily: T.mono }}>DCD Lowlight v2.00 LL 2mx</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ flex: 1, padding: '6px 10px', background: T.accent, color: '#fff', borderRadius: 4, fontSize: 11.5, fontWeight: 600, textAlign: 'center' }}>Approve</div>
+          <div style={{ padding: '6px 12px', border: `1px solid ${T.border}`, color: T.inkSoft, borderRadius: 4, fontSize: 11.5, textAlign: 'center' }}>Dismiss</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+<!-- Fallback bootstrap: if babel-standalone silently skipped the root script,
+     evaluate it manually after DOMContentLoaded settles. -->
+<script>
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    if (document.getElementById('root').children.length > 0) return;
+    const scripts = document.querySelectorAll('script[type="text/babel"]');
+    const root = scripts[scripts.length - 1];
+    if (!root || typeof Babel === 'undefined') return;
+    try {
+      const code = Babel.transform(root.textContent, { presets: ['react'] }).code;
+      (0, eval)(code);
+    } catch (e) {
+      console.error('[fallback bootstrap]', e);
+    }
+  }, 200);
+});
+</script>
+
+</body>
+</html>

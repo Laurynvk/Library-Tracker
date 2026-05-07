@@ -4,7 +4,7 @@
     {
       "name": "library-tracker",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "library-tracker"],
+      "runtimeArgs": ["run", "dev"],
       "port": 5176
     }
   ]
