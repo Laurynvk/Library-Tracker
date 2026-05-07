@@ -87,6 +87,7 @@ export function TrackDrawer({ track, onClose, onSave }: Props) {
 
       {/* Drawer panel */}
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: 'fixed',
           top: 0,

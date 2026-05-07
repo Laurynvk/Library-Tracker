@@ -71,7 +71,7 @@ export function ActivityFeed({ events }: Props) {
       {sorted.map((event, i) => {
         const isLast = i === sorted.length - 1;
         return (
-          <div key={`${event.at}-${event.kind}`} style={{ display: 'flex', gap: 9, marginBottom: 8, alignItems: 'flex-start' }}>
+          <div key={`${event.at}-${event.kind}-${i}`} style={{ display: 'flex', gap: 9, marginBottom: 8, alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4 }}>
               <div style={{
                 width: 7, height: 7, borderRadius: '50%',
