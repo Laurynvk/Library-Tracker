@@ -15,6 +15,8 @@ import { InvoiceBadge } from './InvoiceBadge';
 type Props = {
   tracks: Track[];
   onUpdateInvoice: (id: string, invoice: InvoiceStatus) => void;
+  onRowClick: (track: Track) => void;
+  selectedTrackId?: string;
 };
 
 const col = createColumnHelper<Track>();
@@ -102,7 +104,7 @@ declare module '@tanstack/react-table' {
   }
 }
 
-export function TrackTable({ tracks, onUpdateInvoice }: Props) {
+export function TrackTable({ tracks, onUpdateInvoice, onRowClick, selectedTrackId }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
 
   const table = useReactTable({
@@ -152,17 +154,26 @@ export function TrackTable({ tracks, onUpdateInvoice }: Props) {
       {/* rows */}
       {table.getRowModel().rows.map((row) => (
         <div
-          key={row.id}
-          style={{
-            display: 'flex', alignItems: 'center',
-            height: 48, padding: ROW_PAD,
-            borderBottom: `1px solid ${THEME.border}`,
-            cursor: 'pointer',
-            fontFamily: THEME.sans,
-            transition: 'background .1s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = THEME.rowHover)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+            key={row.id}
+            onClick={() => onRowClick(row.original)}
+            style={{
+              display: 'flex', alignItems: 'center',
+              height: 48, padding: ROW_PAD,
+              borderBottom: `1px solid ${THEME.border}`,
+              cursor: 'pointer',
+              fontFamily: THEME.sans,
+              transition: 'background .1s',
+              background: row.original.id === selectedTrackId ? THEME.rowActive : 'transparent',
+            }}
+            onMouseEnter={(e) => {
+              if (row.original.id !== selectedTrackId) {
+                e.currentTarget.style.background = THEME.rowHover;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background =
+                row.original.id === selectedTrackId ? THEME.rowActive : 'transparent';
+            }}>
           {row.getVisibleCells().map((cell) => (
             <div
               key={cell.id}
