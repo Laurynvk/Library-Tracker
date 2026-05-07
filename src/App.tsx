@@ -3,6 +3,7 @@ import { fetchTracks, updateTrack } from './lib/tracks';
 import { Toolbar } from './components/Toolbar';
 import { TrackTable } from './components/TrackTable';
 import { Footer } from './components/Footer';
+import { TrackDrawer } from './components/TrackDrawer';
 import { THEME } from './lib/theme';
 import type { Track, InvoiceStatus } from './types/track';
 
@@ -12,6 +13,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterInvoice, setFilterInvoice] = useState('all');
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
   useEffect(() => {
     fetchTracks()
@@ -31,6 +33,15 @@ export default function App() {
     if (filterInvoice !== 'all') list = list.filter((t) => t.invoice === filterInvoice);
     return list;
   }, [tracks, search, filterStatus, filterInvoice]);
+
+  function handleSelectTrack(track: Track) {
+    setSelectedTrack(track);
+  }
+
+  function handleSaveTrack(updated: Track) {
+    setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    setSelectedTrack(updated);
+  }
 
   async function handleUpdateInvoice(id: string, invoice: InvoiceStatus) {
     setTracks((prev) =>
@@ -72,8 +83,15 @@ export default function App() {
       <TrackTable
         tracks={filtered}
         onUpdateInvoice={handleUpdateInvoice}
+        onRowClick={handleSelectTrack}
+        selectedTrackId={selectedTrack?.id}
       />
       <Footer tracks={tracks} />
+      <TrackDrawer
+        track={selectedTrack}
+        onClose={() => setSelectedTrack(null)}
+        onSave={handleSaveTrack}
+      />
     </div>
   );
 }
