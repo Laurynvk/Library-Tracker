@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { THEME, STATUSES, INVOICE_STATES } from '../../lib/theme';
 import { updateTrack } from '../../lib/tracks';
@@ -28,11 +28,6 @@ export function TrackDrawer({ track, onClose, onSave }: Props) {
   const [draft, setDraft] = useState<Track | null>(track);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setDraft(track);
-    setError(null);
-  }, [track]);
 
   if (!track || !draft) return null;
 

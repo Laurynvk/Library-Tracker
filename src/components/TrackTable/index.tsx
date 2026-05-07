@@ -6,7 +6,7 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { THEME, fmtMoney, fmtDate } from '../../lib/theme';
 import type { Track, InvoiceStatus } from '../../types/track';
 import { StatusPill } from './StatusPill';
@@ -15,9 +15,73 @@ import { InvoiceBadge } from './InvoiceBadge';
 type Props = {
   tracks: Track[];
   onUpdateInvoice: (id: string, invoice: InvoiceStatus) => void;
+  onUpdateTitle: (id: string, title: string) => void;
   onRowClick: (track: Track) => void;
   selectedTrackId?: string;
 };
+
+function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEdit() {
+    setDraft(value);
+    setEditing(true);
+  }
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (trimmed !== value) onCommit(trimmed);
+    setEditing(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          fontSize: 13, fontWeight: 500, color: THEME.ink,
+          background: THEME.surfaceAlt,
+          border: `1px solid ${THEME.accent}`,
+          borderRadius: 4,
+          padding: '2px 6px',
+          width: '100%',
+          fontFamily: THEME.sans,
+          outline: 'none',
+        }}
+      />
+    );
+  }
+
+  const isEmpty = !value;
+  return (
+    <span
+      onClick={startEdit}
+      style={{
+        fontSize: 13, fontWeight: isEmpty ? 400 : 500,
+        color: isEmpty ? THEME.inkMuted : THEME.ink,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block',
+        cursor: 'text',
+        padding: '2px 0',
+        fontStyle: isEmpty ? 'italic' : 'normal',
+      }}
+    >
+      {isEmpty ? 'Add title' : value}
+    </span>
+  );
+}
 
 const col = createColumnHelper<Track>();
 
@@ -31,11 +95,12 @@ const columns = [
     ),
   }),
   col.accessor('title', {
-    header: 'Track',
+    header: 'Track Title',
     cell: (i) => (
-      <span style={{ fontSize: 13, fontWeight: 500, color: THEME.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-        {i.getValue()}
-      </span>
+      <EditableTitle
+        value={i.getValue()}
+        onCommit={(title) => i.table.options.meta?.onUpdateTitle(i.row.original.id, title)}
+      />
     ),
   }),
   col.accessor('album', {
@@ -99,12 +164,14 @@ const COL_WIDTHS: Record<string, string> = {
 };
 
 declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData> {
     onUpdateInvoice: (id: string, invoice: InvoiceStatus) => void;
+    onUpdateTitle: (id: string, title: string) => void;
   }
 }
 
-export function TrackTable({ tracks, onUpdateInvoice, onRowClick, selectedTrackId }: Props) {
+export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onRowClick, selectedTrackId }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
 
   const table = useReactTable({
@@ -114,7 +181,7 @@ export function TrackTable({ tracks, onUpdateInvoice, onRowClick, selectedTrackI
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    meta: { onUpdateInvoice },
+    meta: { onUpdateInvoice, onUpdateTitle },
   });
 
   const ROW_PAD = '0 18px';
@@ -177,6 +244,7 @@ export function TrackTable({ tracks, onUpdateInvoice, onRowClick, selectedTrackI
           {row.getVisibleCells().map((cell) => (
             <div
               key={cell.id}
+              onClick={cell.column.id === 'title' ? (e) => e.stopPropagation() : undefined}
               style={{
                 flex: COL_WIDTHS[cell.column.id] ?? '1 1 100px',
                 paddingRight: 12,

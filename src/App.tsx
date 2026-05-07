@@ -54,6 +54,16 @@ export default function App() {
     }
   }
 
+  async function handleUpdateTitle(id: string, title: string) {
+    setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, title } : t)));
+    setSelectedTrack((prev) => (prev?.id === id ? { ...prev, title } : prev));
+    try {
+      await updateTrack(id, { title });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   if (error) {
     return (
       <div style={{ padding: 40, fontFamily: THEME.sans, color: '#c44545' }}>
@@ -83,11 +93,13 @@ export default function App() {
       <TrackTable
         tracks={filtered}
         onUpdateInvoice={handleUpdateInvoice}
+        onUpdateTitle={handleUpdateTitle}
         onRowClick={handleSelectTrack}
         selectedTrackId={selectedTrack?.id}
       />
       <Footer tracks={tracks} />
       <TrackDrawer
+        key={selectedTrack?.id ?? 'none'}
         track={selectedTrack}
         onClose={() => setSelectedTrack(null)}
         onSave={handleSaveTrack}
