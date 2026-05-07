@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
-import { THEME } from '../../lib/theme';
+import { THEME, STATUSES, INVOICE_STATES } from '../../lib/theme';
 import { updateTrack } from '../../lib/tracks';
 import type { Track } from '../../types/track';
 import { ActivityFeed } from './ActivityFeed';
 import { DrawerField } from './DrawerField';
-import { STATUSES, INVOICE_STATES } from '../../lib/theme';
 
 type Props = {
   track: Track | null;
@@ -394,5 +393,3 @@ export function TrackDrawer({ track, onClose, onSave }: Props) {
   );
 }
 
-// INPUT_STYLE exported for reuse by DrawerField in Task 4
-export { INPUT_STYLE };
