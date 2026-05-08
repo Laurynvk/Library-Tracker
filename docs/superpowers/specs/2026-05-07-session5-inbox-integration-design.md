@@ -15,7 +15,7 @@ An inbox integration that watches for Pibox notification emails and automaticall
 
 **One-time setup (user does this once):**
 1. User opens the Inbox panel — the app generates a unique forwarding address (e.g. `u_k7x2m9@inbound.librarytracker.app`)
-2. User creates one Gmail filter: forward emails from Pibox's notification address to their Library Tracker address (user needs to check their Gmail for the actual Pibox sender address)
+2. User creates one Gmail filter: forward emails from `notifications@pibox.com` to their Library Tracker address
 3. User clicks "I'm ready" — setup is complete, never touched again
 
 **Every time after (automatic):**
@@ -98,7 +98,7 @@ Triggered by SendGrid webhook on every inbound email.
    - The email subject + body
    - The list of tracks (code, title, publisher, current status)
    - Instruction: identify which track this is about, propose a status, quote the relevant excerpt
-   - **Note:** the actual Pibox sender address must be confirmed before build and hardcoded into the onboarding filter instructions
+   - Pibox sender address is `notifications@pibox.com`
 6. Parse Claude's response:
    - If match found → insert `inbox_items` row with `state: pending`
    - If no match → insert `inbox_items` row with `track_id: null`, `state: pending`
