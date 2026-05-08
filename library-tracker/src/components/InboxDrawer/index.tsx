@@ -52,7 +52,6 @@ export function InboxDrawer({ userId, onClose, onPendingCountChange }: Props) {
         }
       } catch (e) {
         setError((e as Error).message);
-        setState('active');
       }
     }
     init();
@@ -83,14 +82,16 @@ export function InboxDrawer({ userId, onClose, onPendingCountChange }: Props) {
 
   async function handleApprove(item: InboxItem) {
     await approveProposal(item);
-    setItems((prev) => prev.filter((i) => i.id !== item.id));
-    onPendingCountChange(items.length - 1);
+    const newItems = items.filter((i) => i.id !== item.id);
+    setItems(newItems);
+    onPendingCountChange(newItems.length);
   }
 
   async function handleDismiss(itemId: string) {
     await dismissProposal(itemId);
-    setItems((prev) => prev.filter((i) => i.id !== itemId));
-    onPendingCountChange(items.length - 1);
+    const newItems = items.filter((i) => i.id !== itemId);
+    setItems(newItems);
+    onPendingCountChange(newItems.length);
   }
 
   return (
@@ -150,7 +151,9 @@ export function InboxDrawer({ userId, onClose, onPendingCountChange }: Props) {
 
         {/* Body */}
         {state === 'loading' && (
-          <div style={{ padding: 20, color: THEME.inkMuted, fontSize: 12 }}>Loading…</div>
+          <div style={{ padding: 20, color: error ? '#c44545' : THEME.inkMuted, fontSize: 12 }}>
+            {error ?? 'Loading…'}
+          </div>
         )}
 
         {state === 'setup' && (
