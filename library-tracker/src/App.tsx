@@ -158,7 +158,7 @@ export default function App() {
       />
       {inboxOpen && (
         <InboxDrawer
-          userId="PLACEHOLDER_USER_ID"
+          userId="4daf3a38-2ab6-42f4-82f1-de5a2483794d"
           onClose={() => setInboxOpen(false)}
           onPendingCountChange={setInboxPendingCount}
         />
