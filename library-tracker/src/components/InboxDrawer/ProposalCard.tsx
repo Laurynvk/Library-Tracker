@@ -6,6 +6,7 @@ type Props = {
   item: InboxItem;
   onApprove: (item: InboxItem) => Promise<void>;
   onDismiss: (itemId: string) => Promise<void>;
+  onViewEmail?: (rawEmail: string) => void;
 };
 
 function relativeTime(iso: string): string {
@@ -18,7 +19,7 @@ function relativeTime(iso: string): string {
   return fmtDate(iso);
 }
 
-export function ProposalCard({ item, onApprove, onDismiss }: Props) {
+export function ProposalCard({ item, onApprove, onDismiss, onViewEmail }: Props) {
   const [loading, setLoading] = useState<'approve' | 'dismiss' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,6 +118,15 @@ export function ProposalCard({ item, onApprove, onDismiss }: Props) {
             style={{ ...btnBase, background: THEME.accent, color: '#fff', flex: 1 }}
           >
             {loading === 'approve' ? 'Approving…' : 'Approve'}
+          </button>
+        )}
+        {!isMatched && onViewEmail && (
+          <button
+            onClick={() => onViewEmail(item.raw_email)}
+            disabled={loading !== null}
+            style={{ ...btnBase, background: THEME.surfaceAlt, border: `1px solid ${THEME.border}`, color: THEME.ink }}
+          >
+            View full email
           </button>
         )}
         <button
