@@ -8,6 +8,8 @@ type Props = {
   onFilterStatus: (v: string) => void;
   filterInvoice: string;
   onFilterInvoice: (v: string) => void;
+  inboxPendingCount: number;
+  onInboxOpen: () => void;
 };
 
 export function Toolbar({
@@ -18,6 +20,8 @@ export function Toolbar({
   onFilterStatus,
   filterInvoice,
   onFilterInvoice,
+  inboxPendingCount,
+  onInboxOpen,
 }: Props) {
   const selectStyle: React.CSSProperties = {
     height: 30,
@@ -55,20 +59,40 @@ export function Toolbar({
           </span>
         </div>
         <div style={{ flex: 1 }} />
-        <button style={{
-          padding: '7px 12px',
-          background: 'transparent',
-          color: THEME.inkSoft,
-          border: `1px solid ${THEME.border}`,
-          borderRadius: 6,
-          fontSize: 12.5, fontWeight: 500,
-          cursor: 'pointer', fontFamily: THEME.sans,
-          display: 'flex', alignItems: 'center', gap: 6,
-        }}>
+        <button
+          onClick={onInboxOpen}
+          style={{
+            position: 'relative',
+            padding: '7px 12px',
+            background: 'transparent',
+            color: THEME.inkSoft,
+            border: `1px solid ${THEME.border}`,
+            borderRadius: 6,
+            fontSize: 12.5, fontWeight: 500,
+            cursor: 'pointer', fontFamily: THEME.sans,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}
+        >
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4">
             <path d="M2 4l4.5 3.5L11 4M2 3h9v7H2z" />
           </svg>
           Inbox
+          {inboxPendingCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: -5, right: -5,
+              background: THEME.accent,
+              color: '#fff',
+              fontSize: 9,
+              fontWeight: 700,
+              minWidth: 16, height: 16,
+              borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 4px',
+            }}>
+              {inboxPendingCount}
+            </span>
+          )}
         </button>
         <button style={{
           padding: '7px 14px',

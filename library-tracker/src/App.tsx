@@ -4,6 +4,7 @@ import { Toolbar } from './components/Toolbar';
 import { TrackTable } from './components/TrackTable';
 import { Footer } from './components/Footer';
 import { TrackDrawer } from './components/TrackDrawer';
+import { InboxDrawer } from './components/InboxDrawer';
 import { THEME } from './lib/theme';
 import type { Track, InvoiceStatus } from './types/track';
 
@@ -21,6 +22,8 @@ export default function App() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterInvoice, setFilterInvoice] = useState('all');
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxPendingCount, setInboxPendingCount] = useState(0);
 
   useEffect(() => {
     fetchTracks()
@@ -134,6 +137,8 @@ export default function App() {
         onFilterStatus={setFilterStatus}
         filterInvoice={filterInvoice}
         onFilterInvoice={setFilterInvoice}
+        inboxPendingCount={inboxPendingCount}
+        onInboxOpen={() => setInboxOpen(true)}
       />
       <TrackTable
         tracks={filtered}
@@ -151,6 +156,13 @@ export default function App() {
         onClose={() => setSelectedTrack(null)}
         onSave={handleSaveTrack}
       />
+      {inboxOpen && (
+        <InboxDrawer
+          userId="PLACEHOLDER_USER_ID"
+          onClose={() => setInboxOpen(false)}
+          onPendingCountChange={setInboxPendingCount}
+        />
+      )}
     </div>
   );
 }
