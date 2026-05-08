@@ -52,3 +52,20 @@ export type Track = {
 export type NewTrack = Omit<Track, 'id' | 'created_at' | 'activity'> & {
   activity?: ActivityEvent[];
 };
+
+export type InboxItemState = 'pending' | 'approved' | 'dismissed';
+
+export type InboxItem = {
+  id: string;
+  user_id: string;
+  track_id: string | null;
+  raw_email: string;
+  sender: string;
+  subject: string;
+  excerpt: string;
+  proposed_status: StatusId | null;
+  current_status: StatusId | null;
+  state: InboxItemState;
+  created_at: string;
+  resolved_at: string | null;
+};
