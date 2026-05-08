@@ -12,7 +12,7 @@ export async function fetchOrCreateInboxAddress(userId: string): Promise<string>
   if (existing) return existing.address;
 
   const slug = Math.random().toString(36).slice(2, 10);
-  const address = `u_${slug}@inbound.librarytracker.app`;
+  const address = `u_${slug}@inbound.qlogger.org`;
 
   const { error } = await supabase
     .from('user_inbox_addresses')
