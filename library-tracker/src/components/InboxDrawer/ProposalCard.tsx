@@ -85,7 +85,7 @@ export function ProposalCard({ item, onApprove, onDismiss, onViewEmail }: Props)
       </div>
 
       {/* Excerpt */}
-      <div style={{ fontSize: 11, color: THEME.inkSoft, fontStyle: 'italic', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 11, color: THEME.inkSoft, fontStyle: isMatched ? 'italic' : 'normal', lineHeight: 1.5 }}>
         "{item.excerpt}"
       </div>
 
