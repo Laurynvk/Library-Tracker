@@ -44,6 +44,7 @@ export type Track = {
   brief_link: string | null;
   folder_path: string | null;
   brief_parsed_at: string | null;
+  file_naming: string | null;
   collaborators: string[];
   notes: string | null;
   activity: ActivityEvent[];
