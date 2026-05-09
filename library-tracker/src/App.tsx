@@ -6,6 +6,7 @@ import { Footer } from './components/Footer';
 import { TrackDrawer } from './components/TrackDrawer';
 import { InboxDrawer } from './components/InboxDrawer';
 import { BriefModal } from './components/BriefModal';
+import { SettingsModal } from './components/SettingsModal';
 import { THEME } from './lib/theme';
 import type { Track, InvoiceStatus } from './types/track';
 
@@ -26,6 +27,7 @@ export default function App() {
   const [inboxOpen, setInboxOpen] = useState(false);
   const [inboxPendingCount, setInboxPendingCount] = useState(0);
   const [briefOpen, setBriefOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     fetchTracks()
@@ -146,6 +148,7 @@ export default function App() {
         inboxPendingCount={inboxPendingCount}
         onInboxOpen={() => setInboxOpen(true)}
         onNewFromBrief={() => setBriefOpen(true)}
+        onSettingsOpen={() => setSettingsOpen(true)}
       />
       <TrackTable
         tracks={filtered}
@@ -175,6 +178,9 @@ export default function App() {
           onClose={() => setBriefOpen(false)}
           onCreated={handleBriefCreated}
         />
+      )}
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   );

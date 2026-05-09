@@ -11,6 +11,7 @@ type Props = {
   inboxPendingCount: number;
   onInboxOpen: () => void;
   onNewFromBrief: () => void;
+  onSettingsOpen: () => void;
 };
 
 export function Toolbar({
@@ -24,6 +25,7 @@ export function Toolbar({
   inboxPendingCount,
   onInboxOpen,
   onNewFromBrief,
+  onSettingsOpen,
 }: Props) {
   const selectStyle: React.CSSProperties = {
     height: 30,
@@ -113,6 +115,24 @@ export function Toolbar({
             <path d="M5.5 1v9M1 5.5h9" />
           </svg>
           New Brief
+        </button>
+        <button
+          onClick={onSettingsOpen}
+          title="Settings"
+          style={{
+            padding: '7px 10px',
+            background: 'transparent',
+            color: THEME.inkSoft,
+            border: `1px solid ${THEME.border}`,
+            borderRadius: 6,
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4">
+            <circle cx="7" cy="7" r="2" />
+            <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.93 2.93l1.06 1.06M10.01 10.01l1.06 1.06M2.93 11.07l1.06-1.06M10.01 3.99l1.06-1.06" strokeLinecap="round"/>
+          </svg>
         </button>
       </div>
 
