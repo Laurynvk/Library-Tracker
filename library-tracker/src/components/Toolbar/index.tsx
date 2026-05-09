@@ -1,4 +1,4 @@
-import { THEME, STATUSES, INVOICE_STATES } from '../../lib/theme';
+import { useTheme, STATUSES, INVOICE_STATES } from '../../lib/theme';
 
 type Props = {
   trackCount: number;
@@ -27,6 +27,7 @@ export function Toolbar({
   onNewFromBrief,
   onSettingsOpen,
 }: Props) {
+  const THEME = useTheme();
   const selectStyle: React.CSSProperties = {
     height: 30,
     padding: '0 28px 0 10px',

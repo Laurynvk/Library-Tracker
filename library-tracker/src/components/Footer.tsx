@@ -1,4 +1,4 @@
-import { THEME, fmtMoney } from '../lib/theme';
+import { useTheme, fmtMoney } from '../lib/theme';
 import type { Track } from '../types/track';
 
 type Props = {
@@ -6,6 +6,7 @@ type Props = {
 };
 
 export function Footer({ tracks }: Props) {
+  const THEME = useTheme();
   const active = tracks.filter(
     (t) => t.status !== 'delivered' && t.status !== 'rejected'
   ).length;

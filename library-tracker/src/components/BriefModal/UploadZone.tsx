@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { THEME } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 
 const ACCEPTED = {
   'application/pdf': ['.pdf'],
@@ -16,6 +16,7 @@ type Props = {
 };
 
 export function UploadZone({ onFile, onText }: Props) {
+  const THEME = useTheme();
   const [pasteMode, setPasteMode] = useState(false);
   const [pasteText, setPasteText] = useState('');
 

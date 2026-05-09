@@ -6,8 +6,8 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import { useState, useRef } from 'react';
-import { THEME, fmtMoney, fmtDate } from '../../lib/theme';
+import { useState, useRef, useMemo } from 'react';
+import { useTheme, fmtMoney, fmtDate } from '../../lib/theme';
 import type { Track, InvoiceStatus } from '../../types/track';
 import { StatusPill } from './StatusPill';
 import { InvoiceBadge } from './InvoiceBadge';
@@ -23,6 +23,7 @@ type Props = {
 };
 
 function EditableCode({ value, onCommit }: { value: string | null; onCommit: (v: string | null) => void }) {
+  const THEME = useTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
 
@@ -78,6 +79,7 @@ function EditableCode({ value, onCommit }: { value: string | null; onCommit: (v:
 }
 
 function EditableVersion({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  const THEME = useTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
@@ -136,6 +138,7 @@ function EditableVersion({ value, onCommit }: { value: string; onCommit: (v: str
 }
 
 function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  const THEME = useTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -214,98 +217,6 @@ function formatSplitsInline(collaborators: string[]): string {
 
 const col = createColumnHelper<Track>();
 
-// Column order: Code > Title > Version > Album > Publisher > Status > Due > Fee > Invoice > Splits
-const columns = [
-  col.accessor('code', {
-    header: 'Project Code',
-    cell: (i) => (
-      <EditableCode
-        value={i.getValue()}
-        onCommit={(code) => i.table.options.meta?.onUpdateCode(i.row.original.id, code)}
-      />
-    ),
-  }),
-  col.accessor('title', {
-    header: 'Track Title',
-    cell: (i) => (
-      <EditableTitle
-        value={i.getValue()}
-        onCommit={(title) => i.table.options.meta?.onUpdateTitle(i.row.original.id, title)}
-      />
-    ),
-  }),
-  col.accessor('version', {
-    header: 'Version',
-    cell: (i) => (
-      <EditableVersion
-        value={i.getValue() || 'v1.00'}
-        onCommit={(version) => i.table.options.meta?.onUpdateVersion(i.row.original.id, version)}
-      />
-    ),
-    enableSorting: false,
-  }),
-  col.accessor('album', {
-    header: 'Album',
-    cell: (i) => (
-      <span style={{ fontSize: 12.5, color: THEME.inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-        {i.getValue() ?? '—'}
-      </span>
-    ),
-  }),
-  col.accessor('publisher', {
-    header: 'Publisher',
-    cell: (i) => (
-      <span style={{ fontSize: 12.5, color: THEME.inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-        {i.getValue() ?? '—'}
-      </span>
-    ),
-  }),
-  col.accessor('status', {
-    header: 'Status',
-    cell: (i) => <StatusPill statusId={i.getValue()} />,
-    enableSorting: false,
-  }),
-  col.accessor('due_date', {
-    header: 'Due',
-    cell: (i) => (
-      <span style={{ fontSize: 12.5, color: THEME.inkSoft, fontVariantNumeric: 'tabular-nums' }}>
-        {fmtDate(i.getValue())}
-      </span>
-    ),
-  }),
-  col.accessor('fee', {
-    header: 'Fee',
-    cell: (i) => (
-      <span style={{ fontSize: 12.5, color: THEME.ink, fontVariantNumeric: 'tabular-nums', display: 'block', textAlign: 'right' }}>
-        {fmtMoney(i.getValue())}
-      </span>
-    ),
-  }),
-  col.accessor('invoice', {
-    header: 'Invoice',
-    cell: (i) => (
-      <InvoiceBadge
-        value={i.getValue()}
-        onCycle={(next) => i.table.options.meta?.onUpdateInvoice(i.row.original.id, next)}
-      />
-    ),
-    enableSorting: false,
-  }),
-  col.accessor('collaborators', {
-    header: 'Splits',
-    cell: (i) => (
-      <span style={{
-        fontSize: 12, color: THEME.inkSoft,
-        fontFamily: THEME.mono,
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block',
-      }}>
-        {formatSplitsInline(i.getValue())}
-      </span>
-    ),
-    enableSorting: false,
-  }),
-];
-
 const COL_WIDTHS: Record<string, string> = {
   code:          '0 0 220px',
   title:         '1 1 140px',
@@ -330,7 +241,103 @@ declare module '@tanstack/react-table' {
 }
 
 export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId }: Props) {
+  const THEME = useTheme();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
+
+  // Column order: Code > Title > Version > Album > Publisher > Status > Due > Fee > Invoice > Splits
+  const columns = useMemo(
+    () => [
+      col.accessor('code', {
+        header: 'Project Code',
+        cell: (i) => (
+          <EditableCode
+            value={i.getValue()}
+            onCommit={(code) => i.table.options.meta?.onUpdateCode(i.row.original.id, code)}
+          />
+        ),
+      }),
+      col.accessor('title', {
+        header: 'Track Title',
+        cell: (i) => (
+          <EditableTitle
+            value={i.getValue()}
+            onCommit={(title) => i.table.options.meta?.onUpdateTitle(i.row.original.id, title)}
+          />
+        ),
+      }),
+      col.accessor('version', {
+        header: 'Version',
+        cell: (i) => (
+          <EditableVersion
+            value={i.getValue() || 'v1.00'}
+            onCommit={(version) => i.table.options.meta?.onUpdateVersion(i.row.original.id, version)}
+          />
+        ),
+        enableSorting: false,
+      }),
+      col.accessor('album', {
+        header: 'Album',
+        cell: (i) => (
+          <span style={{ fontSize: 12.5, color: THEME.inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+            {i.getValue() ?? '—'}
+          </span>
+        ),
+      }),
+      col.accessor('publisher', {
+        header: 'Publisher',
+        cell: (i) => (
+          <span style={{ fontSize: 12.5, color: THEME.inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+            {i.getValue() ?? '—'}
+          </span>
+        ),
+      }),
+      col.accessor('status', {
+        header: 'Status',
+        cell: (i) => <StatusPill statusId={i.getValue()} />,
+        enableSorting: false,
+      }),
+      col.accessor('due_date', {
+        header: 'Due',
+        cell: (i) => (
+          <span style={{ fontSize: 12.5, color: THEME.inkSoft, fontVariantNumeric: 'tabular-nums' }}>
+            {fmtDate(i.getValue())}
+          </span>
+        ),
+      }),
+      col.accessor('fee', {
+        header: 'Fee',
+        cell: (i) => (
+          <span style={{ fontSize: 12.5, color: THEME.ink, fontVariantNumeric: 'tabular-nums', display: 'block', textAlign: 'right' }}>
+            {fmtMoney(i.getValue())}
+          </span>
+        ),
+      }),
+      col.accessor('invoice', {
+        header: 'Invoice',
+        cell: (i) => (
+          <InvoiceBadge
+            value={i.getValue()}
+            onCycle={(next) => i.table.options.meta?.onUpdateInvoice(i.row.original.id, next)}
+          />
+        ),
+        enableSorting: false,
+      }),
+      col.accessor('collaborators', {
+        header: 'Splits',
+        cell: (i) => (
+          <span style={{
+            fontSize: 12, color: THEME.inkSoft,
+            fontFamily: THEME.mono,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block',
+          }}>
+            {formatSplitsInline(i.getValue())}
+          </span>
+        ),
+        enableSorting: false,
+      }),
+    ],
+    [THEME],
+  );
 
   const table = useReactTable({
     data: tracks,

@@ -1,5 +1,5 @@
 // src/components/TrackDrawer/DrawerField.tsx
-import { THEME } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 
 type Props = {
   label: string;
@@ -7,6 +7,7 @@ type Props = {
 };
 
 export function DrawerField({ label, children }: Props) {
+  const THEME = useTheme();
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{

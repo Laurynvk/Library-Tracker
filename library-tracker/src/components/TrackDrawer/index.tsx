@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
-import { THEME, STATUSES, INVOICE_STATES } from '../../lib/theme';
+import { useTheme, STATUSES, INVOICE_STATES } from '../../lib/theme';
 import { updateTrack } from '../../lib/tracks';
 import type { Track } from '../../types/track';
 import { ActivityFeed } from './ActivityFeed';
@@ -26,6 +26,7 @@ function serializeComposers(rows: { initials: string; pct: string }[]): string[]
 }
 
 function ComposerSplits({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const THEME = useTheme();
   const rows = parseComposers(value.length ? value : []);
   const total = rows.reduce((sum, r) => sum + (Number(r.pct) || 0), 0);
   const totalOk = total === 100;
@@ -109,22 +110,23 @@ function ComposerSplits({ value, onChange }: { value: string[]; onChange: (v: st
   );
 }
 
-const INPUT_STYLE: CSSProperties = {
-  width: '100%',
-  background: THEME.surfaceAlt,
-  border: `1px solid ${THEME.border}`,
-  borderRadius: 4,
-  padding: '6px 9px',
-  fontSize: 13,
-  color: THEME.ink,
-  fontFamily: THEME.sans,
-  outline: 'none',
-};
-
 export function TrackDrawer({ track, onClose, onSave }: Props) {
+  const THEME = useTheme();
   const [draft, setDraft] = useState<Track | null>(track);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const INPUT_STYLE: CSSProperties = {
+    width: '100%',
+    background: THEME.surfaceAlt,
+    border: `1px solid ${THEME.border}`,
+    borderRadius: 4,
+    padding: '6px 9px',
+    fontSize: 13,
+    color: THEME.ink,
+    fontFamily: THEME.sans,
+    outline: 'none',
+  };
 
   if (!track || !draft) return null;
 
