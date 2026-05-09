@@ -1,6 +1,6 @@
 // library-tracker/src/components/BriefModal/index.tsx
 import { useState } from 'react';
-import { THEME } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 import { parseBriefFile, parseBriefText, type ParsedBrief } from '../../lib/parseBrief';
 import { createTrack } from '../../lib/tracks';
 import {
@@ -34,6 +34,7 @@ const STEPS: { id: Step; label: string }[] = [
 ];
 
 export function BriefModal({ onClose, onCreated }: Props) {
+  const THEME = useTheme();
   const [step, setStep] = useState<Step>('upload');
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedBrief | null>(null);
@@ -76,10 +77,12 @@ export function BriefModal({ onClose, onCreated }: Props) {
   async function applyParsed(result: ParsedBrief) {
     let fileNaming = result.file_naming ?? '';
     let fromSettings = false;
+    let defaultVersion = 'v1.00';
 
-    if (!fileNaming) {
-      try {
-        const s = await fetchSettings();
+    try {
+      const s = await fetchSettings();
+      defaultVersion = s.default_version ?? 'v1.00';
+      if (!fileNaming) {
         const t = s.naming_templates;
         const publisherKey = result.publisher;
         if (publisherKey && t.publishers?.[publisherKey]) {
@@ -89,16 +92,16 @@ export function BriefModal({ onClose, onCreated }: Props) {
           fileNaming = t.default;
           fromSettings = true;
         }
-      } catch {
-        // settings unavailable — leave field empty
       }
+    } catch {
+      // settings unavailable — use defaults
     }
 
     setParsed(result);
     setFileNamingFromSettings(fromSettings);
     setValues({
       code: result.code ?? '',
-      version: 'v1.00',
+      version: defaultVersion,
       album: result.album ?? '',
       publisher: result.publisher ?? '',
       due_date: result.due_date ?? '',
