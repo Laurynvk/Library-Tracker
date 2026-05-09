@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { THEME } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 import {
   fetchOrCreateInboxAddress,
   fetchInboxAddress,
@@ -22,6 +22,7 @@ type Props = {
 type InboxState = 'loading' | 'setup' | 'active';
 
 export function InboxDrawer({ userId, onClose, onPendingCountChange }: Props) {
+  const THEME = useTheme();
   const [state, setState] = useState<InboxState>('loading');
   const [address, setAddress] = useState('');
   const [items, setItems] = useState<InboxItem[]>([]);

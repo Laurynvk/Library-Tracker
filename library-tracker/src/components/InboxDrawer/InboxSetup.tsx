@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { THEME } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 
 type Props = {
   address: string;
@@ -7,6 +7,7 @@ type Props = {
 };
 
 export function InboxSetup({ address, onReady }: Props) {
+  const THEME = useTheme();
   const [copied, setCopied] = useState(false);
 
   function copyAddress() {

@@ -7,7 +7,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { useState, useRef } from 'react';
-import { THEME, fmtMoney, fmtDate } from '../../lib/theme';
+import { useTheme, fmtMoney, fmtDate } from '../../lib/theme';
 import type { Track, InvoiceStatus } from '../../types/track';
 import { StatusPill } from './StatusPill';
 import { InvoiceBadge } from './InvoiceBadge';
@@ -23,6 +23,7 @@ type Props = {
 };
 
 function EditableCode({ value, onCommit }: { value: string | null; onCommit: (v: string | null) => void }) {
+  const THEME = useTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
 
@@ -78,6 +79,7 @@ function EditableCode({ value, onCommit }: { value: string | null; onCommit: (v:
 }
 
 function EditableVersion({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  const THEME = useTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
@@ -136,6 +138,7 @@ function EditableVersion({ value, onCommit }: { value: string; onCommit: (v: str
 }
 
 function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  const THEME = useTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -330,6 +333,7 @@ declare module '@tanstack/react-table' {
 }
 
 export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId }: Props) {
+  const THEME = useTheme();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
 
   const table = useReactTable({

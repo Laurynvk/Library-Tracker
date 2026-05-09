@@ -1,4 +1,4 @@
-import { THEME } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 import type { ParsedBrief } from '../../lib/parseBrief';
 
 export interface ReviewValues {
@@ -20,28 +20,30 @@ type Props = {
   fileNamingFromSettings?: boolean;
 };
 
-const fieldStyle: React.CSSProperties = {
-  fontSize: 13, color: THEME.ink, background: '#fff',
-  border: `1px solid ${THEME.border}`, borderRadius: 6,
-  padding: '7px 10px', fontFamily: THEME.sans, outline: 'none', width: '100%',
-};
-
-const extractedStyle: React.CSSProperties = {
-  ...fieldStyle,
-  borderColor: '#b8d4b0', background: '#f4fbf3', color: '#2a6e22',
-};
-
-const settingsStyle: React.CSSProperties = {
-  ...fieldStyle,
-  borderColor: '#c4b8a8',
-  background: '#f8f4ef',
-};
-
 function wasExtracted(value: string, parsedValue: string | null): boolean {
   return !!parsedValue && value === parsedValue;
 }
 
 export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNamingFromSettings }: Props) {
+  const THEME = useTheme();
+
+  const fieldStyle: React.CSSProperties = {
+    fontSize: 13, color: THEME.ink, background: '#fff',
+    border: `1px solid ${THEME.border}`, borderRadius: 6,
+    padding: '7px 10px', fontFamily: THEME.sans, outline: 'none', width: '100%',
+  };
+
+  const extractedStyle: React.CSSProperties = {
+    ...fieldStyle,
+    borderColor: '#b8d4b0', background: '#f4fbf3', color: '#2a6e22',
+  };
+
+  const settingsStyle: React.CSSProperties = {
+    ...fieldStyle,
+    borderColor: '#c4b8a8',
+    background: '#f8f4ef',
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -59,7 +61,7 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>Project Code</Label>
+          <Label THEME={THEME}>Project Code</Label>
           <input
             style={wasExtracted(values.code, parsed.code) ? extractedStyle : fieldStyle}
             value={values.code}
@@ -69,7 +71,7 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>Version</Label>
+          <Label THEME={THEME}>Version</Label>
           <input
             style={fieldStyle}
             value={values.version}
@@ -78,7 +80,7 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>Album</Label>
+          <Label THEME={THEME}>Album</Label>
           <input
             style={wasExtracted(values.album, parsed.album) ? extractedStyle : fieldStyle}
             value={values.album}
@@ -88,7 +90,7 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>Publisher</Label>
+          <Label THEME={THEME}>Publisher</Label>
           <input
             style={wasExtracted(values.publisher, parsed.publisher) ? extractedStyle : fieldStyle}
             value={values.publisher}
@@ -98,7 +100,7 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>Due Date</Label>
+          <Label THEME={THEME}>Due Date</Label>
           <input
             type="date"
             style={wasExtracted(values.due_date, parsed.due_date) ? extractedStyle : fieldStyle}
@@ -108,7 +110,7 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>Fee</Label>
+          <Label THEME={THEME}>Fee</Label>
           <input
             style={wasExtracted(values.fee, parsed.fee) ? extractedStyle : fieldStyle}
             value={values.fee}
@@ -119,7 +121,7 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
 
         {/* File naming — full width */}
         <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Label>File Naming System</Label>
+          <Label THEME={THEME}>File Naming System</Label>
           <input
             style={
               wasExtracted(values.file_naming, parsed.file_naming)
@@ -171,7 +173,7 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
+function Label({ children, THEME }: { children: React.ReactNode; THEME: ReturnType<typeof useTheme> }) {
   return (
     <span style={{
       fontSize: 10.5, fontWeight: 600, color: THEME.inkMuted,

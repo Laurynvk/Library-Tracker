@@ -1,4 +1,4 @@
-import { THEME } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 import {
   isFileSystemAccessSupported,
   createFoldersOnDesktop,
@@ -16,7 +16,7 @@ type Props = {
   onFolderPathSet: (path: string) => void;
 };
 
-function FolderIcon() {
+function FolderIcon({ THEME }: { THEME: ReturnType<typeof useTheme> }) {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill={THEME.inkMuted} style={{ flexShrink: 0 }}>
       <path d="M2 4a2 2 0 012-2h3l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V4z" />
@@ -25,6 +25,7 @@ function FolderIcon() {
 }
 
 export function FolderBuilder({ albumName, trackTitle, folders, onFoldersChange, onFolderPathSet }: Props) {
+  const THEME = useTheme();
   const fsSupported = isFileSystemAccessSupported();
   const spec: FolderSpec = {
     albumName: albumName || 'New Album',
@@ -77,7 +78,7 @@ export function FolderBuilder({ albumName, trackTitle, folders, onFoldersChange,
         {folders.map((name, i) => (
           <div key={i}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <FolderIcon />
+              <FolderIcon THEME={THEME} />
               <input
                 value={name}
                 onChange={(e) => updateFolder(i, e.target.value)}

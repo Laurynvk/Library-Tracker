@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { THEME, statusById, fmtDate } from '../../lib/theme';
+import { useTheme, statusById, fmtDate } from '../../lib/theme';
 import type { InboxItem } from '../../types/track';
 
 type Props = {
@@ -20,6 +20,7 @@ function relativeTime(iso: string): string {
 }
 
 export function ProposalCard({ item, onApprove, onDismiss, onViewEmail }: Props) {
+  const THEME = useTheme();
   const [loading, setLoading] = useState<'approve' | 'dismiss' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
