@@ -157,7 +157,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: THEME.ink, letterSpacing: -0.3 }}>
-            New from Brief
+            New Brief
           </span>
           <button
             onClick={onClose}
