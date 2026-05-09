@@ -29,7 +29,7 @@ function parseFeeToNumber(raw: string): number | null {
 const STEPS: { id: Step; label: string }[] = [
   { id: 'upload', label: 'Upload' },
   { id: 'reading', label: 'Reading Brief' },
-  { id: 'review', label: 'Review & Approve' },
+  { id: 'review', label: 'Review' },
 ];
 
 export function BriefModal({ onClose, onCreated }: Props) {
@@ -173,15 +173,16 @@ export function BriefModal({ onClose, onCreated }: Props) {
 
         {/* Step indicator */}
         <div style={{
-          display: 'flex', alignItems: 'center', padding: '10px 22px',
+          display: 'flex', alignItems: 'center', padding: '10px 24px',
           background: THEME.surfaceAlt, borderBottom: `1px solid ${THEME.border}`,
+          gap: 0,
         }}>
           {STEPS.map((s, i) => (
             <div key={s.id} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
                 <div style={{
                   width: 18, height: 18, borderRadius: '50%', fontSize: 9, fontWeight: 700,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   background: i < stepIndex ? '#2a6e22' : i === stepIndex ? THEME.accent : THEME.border,
                   color: i <= stepIndex ? '#fff' : THEME.inkMuted,
                 }}>
@@ -195,22 +196,10 @@ export function BriefModal({ onClose, onCreated }: Props) {
                 </span>
               </div>
               {i < STEPS.length - 1 && (
-                <div style={{ flex: 1, height: 1, background: THEME.border, margin: '0 8px' }} />
+                <div style={{ flex: 1, height: 1, background: THEME.border, margin: '0 12px' }} />
               )}
             </div>
           ))}
-          {/* Folders step — always last */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 0 }}>
-            <div style={{ flex: 1, height: 1, background: THEME.border, margin: '0 8px', minWidth: 16 }} />
-            <div style={{
-              width: 18, height: 18, borderRadius: '50%', fontSize: 9, fontWeight: 700,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: THEME.border, color: THEME.inkMuted,
-            }}>
-              4
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 600, color: THEME.inkMuted }}>Folders</span>
-          </div>
         </div>
 
         {/* Body */}
