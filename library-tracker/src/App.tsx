@@ -7,7 +7,8 @@ import { TrackDrawer } from './components/TrackDrawer';
 import { InboxDrawer } from './components/InboxDrawer';
 import { BriefModal } from './components/BriefModal';
 import { SettingsModal } from './components/SettingsModal';
-import { THEME } from './lib/theme';
+import { THEME, DARK_THEME, ThemeContext } from './lib/theme';
+import { fetchSettings } from './lib/settings';
 import type { Track, InvoiceStatus } from './types/track';
 
 function bumpVersion(v: string): string {
@@ -28,12 +29,26 @@ export default function App() {
   const [inboxPendingCount, setInboxPendingCount] = useState(0);
   const [briefOpen, setBriefOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     fetchTracks()
       .then(setTracks)
       .catch((e) => setError(e.message));
+    fetchSettings()
+      .then((s) => setDarkMode(s.dark_mode ?? false))
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) {
+      fetchSettings()
+        .then((s) => setDarkMode(s.dark_mode ?? false))
+        .catch(() => {});
+    }
+  }, [settingsOpen]);
+
+  const theme = darkMode ? DARK_THEME : THEME;
 
   const filtered = useMemo(() => {
     let list = [...tracks];
@@ -55,7 +70,6 @@ export default function App() {
   function handleSaveTrack(updated: Track) {
     setTracks((prev) => prev.map((t) => {
       if (t.id !== updated.id) return t;
-      // auto-bump version when status moves to 'revising'
       if (updated.status === 'revising' && t.status !== 'revising') {
         const newVersion = bumpVersion(updated.version || 'v1.00');
         updateTrack(updated.id, { version: newVersion }).catch((e) => setError(e.message));
@@ -122,66 +136,68 @@ export default function App() {
 
   if (error) {
     return (
-      <div style={{ padding: 40, fontFamily: THEME.sans, color: '#c44545' }}>
+      <div style={{ padding: 40, fontFamily: theme.sans, color: '#c44545' }}>
         DB error: {error}
       </div>
     );
   }
 
   return (
-    <div style={{
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      background: THEME.bg,
-      fontFamily: THEME.sans,
-      overflow: 'hidden',
-    }}>
-      <Toolbar
-        trackCount={tracks.length}
-        search={search}
-        onSearch={setSearch}
-        filterStatus={filterStatus}
-        onFilterStatus={setFilterStatus}
-        filterInvoice={filterInvoice}
-        onFilterInvoice={setFilterInvoice}
-        inboxPendingCount={inboxPendingCount}
-        onInboxOpen={() => setInboxOpen(true)}
-        onNewFromBrief={() => setBriefOpen(true)}
-        onSettingsOpen={() => setSettingsOpen(true)}
-      />
-      <TrackTable
-        tracks={filtered}
-        onUpdateInvoice={handleUpdateInvoice}
-        onUpdateTitle={handleUpdateTitle}
-        onUpdateVersion={handleUpdateVersion}
-        onUpdateCode={handleUpdateCode}
-        onRowClick={handleSelectTrack}
-        selectedTrackId={selectedTrack?.id}
-      />
-      <Footer tracks={tracks} />
-      <TrackDrawer
-        key={selectedTrack?.id ?? 'none'}
-        track={selectedTrack}
-        onClose={() => setSelectedTrack(null)}
-        onSave={handleSaveTrack}
-      />
-      {inboxOpen && (
-        <InboxDrawer
-          userId="4daf3a38-2ab6-42f4-82f1-de5a2483794d"
-          onClose={() => setInboxOpen(false)}
-          onPendingCountChange={setInboxPendingCount}
+    <ThemeContext.Provider value={theme}>
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        background: theme.bg,
+        fontFamily: theme.sans,
+        overflow: 'hidden',
+      }}>
+        <Toolbar
+          trackCount={tracks.length}
+          search={search}
+          onSearch={setSearch}
+          filterStatus={filterStatus}
+          onFilterStatus={setFilterStatus}
+          filterInvoice={filterInvoice}
+          onFilterInvoice={setFilterInvoice}
+          inboxPendingCount={inboxPendingCount}
+          onInboxOpen={() => setInboxOpen(true)}
+          onNewFromBrief={() => setBriefOpen(true)}
+          onSettingsOpen={() => setSettingsOpen(true)}
         />
-      )}
-      {briefOpen && (
-        <BriefModal
-          onClose={() => setBriefOpen(false)}
-          onCreated={handleBriefCreated}
+        <TrackTable
+          tracks={filtered}
+          onUpdateInvoice={handleUpdateInvoice}
+          onUpdateTitle={handleUpdateTitle}
+          onUpdateVersion={handleUpdateVersion}
+          onUpdateCode={handleUpdateCode}
+          onRowClick={handleSelectTrack}
+          selectedTrackId={selectedTrack?.id}
         />
-      )}
-      {settingsOpen && (
-        <SettingsModal onClose={() => setSettingsOpen(false)} />
-      )}
-    </div>
+        <Footer tracks={tracks} />
+        <TrackDrawer
+          key={selectedTrack?.id ?? 'none'}
+          track={selectedTrack}
+          onClose={() => setSelectedTrack(null)}
+          onSave={handleSaveTrack}
+        />
+        {inboxOpen && (
+          <InboxDrawer
+            userId="4daf3a38-2ab6-42f4-82f1-de5a2483794d"
+            onClose={() => setInboxOpen(false)}
+            onPendingCountChange={setInboxPendingCount}
+          />
+        )}
+        {briefOpen && (
+          <BriefModal
+            onClose={() => setBriefOpen(false)}
+            onCreated={handleBriefCreated}
+          />
+        )}
+        {settingsOpen && (
+          <SettingsModal onClose={() => setSettingsOpen(false)} />
+        )}
+      </div>
+    </ThemeContext.Provider>
   );
 }
