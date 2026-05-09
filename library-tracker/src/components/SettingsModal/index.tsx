@@ -229,8 +229,8 @@ export function SettingsModal({ onClose }: Props) {
                   onChange={(e) => setEditState((s) => ({ ...s, default: e.target.value }))}
                   onFocus={(e) => trackFocus('default', e)}
                 />
-                <TokenChips />
-                <PreviewLine template={editState.default} />
+                {TokenChips()}
+                {PreviewLine({ template: editState.default })}
               </div>
 
               {/* Per-publisher cards */}
@@ -266,8 +266,8 @@ export function SettingsModal({ onClose }: Props) {
                     }
                     onFocus={(e) => trackFocus(name, e)}
                   />
-                  <TokenChips />
-                  <PreviewLine template={template} />
+                  {TokenChips()}
+                  {PreviewLine({ template })}
                 </div>
               ))}
 
@@ -315,8 +315,8 @@ export function SettingsModal({ onClose }: Props) {
                     onChange={(e) => setAddForm((f) => f ? { ...f, template: e.target.value } : f)}
                     onFocus={(e) => trackFocus('__add__', e)}
                   />
-                  <TokenChips />
-                  <PreviewLine template={addForm.template} />
+                  {TokenChips()}
+                  {PreviewLine({ template: addForm.template })}
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <button
