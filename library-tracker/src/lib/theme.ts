@@ -1,4 +1,23 @@
-export const THEME = {
+import { createContext, useContext } from 'react';
+
+export type Theme = {
+  bg: string;
+  surface: string;
+  surfaceAlt: string;
+  border: string;
+  borderStrong: string;
+  ink: string;
+  inkSoft: string;
+  inkMuted: string;
+  accent: string;
+  accentSoft: string;
+  rowHover: string;
+  rowActive: string;
+  sans: string;
+  mono: string;
+};
+
+export const THEME: Theme = {
   bg:           '#f4f1ea',
   surface:      '#fbf9f4',
   surfaceAlt:   '#efeae0',
@@ -13,9 +32,27 @@ export const THEME = {
   rowActive:    'rgba(184, 89, 58, 0.08)',
   sans:         '"Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif',
   mono:         '"JetBrains Mono", "SF Mono", ui-monospace, monospace',
-} as const;
+};
 
-export type Theme = typeof THEME;
+export const DARK_THEME: Theme = {
+  bg:           '#1a1714',
+  surface:      '#232018',
+  surfaceAlt:   '#2c2820',
+  border:       'rgba(255, 245, 230, 0.10)',
+  borderStrong: 'rgba(255, 245, 230, 0.18)',
+  ink:          '#f0ebe3',
+  inkSoft:      '#b8b0a4',
+  inkMuted:     '#7a7268',
+  accent:       '#d4704a',
+  accentSoft:   'rgba(212, 112, 74, 0.15)',
+  rowHover:     'rgba(255, 245, 230, 0.04)',
+  rowActive:    'rgba(212, 112, 74, 0.10)',
+  sans:         '"Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif',
+  mono:         '"JetBrains Mono", "SF Mono", ui-monospace, monospace',
+};
+
+export const ThemeContext = createContext<Theme>(THEME);
+export function useTheme(): Theme { return useContext(ThemeContext); }
 
 export const STATUSES = [
   { id: 'brief',     label: 'Brief received', color: '#a89b8a' },
