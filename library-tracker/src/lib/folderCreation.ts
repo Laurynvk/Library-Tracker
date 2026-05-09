@@ -17,8 +17,7 @@ export function isFileSystemAccessSupported(): boolean {
  */
 export async function createFoldersOnDesktop(spec: FolderSpec): Promise<string | null> {
   try {
-    const picker = (window as unknown as { showDirectoryPicker: (opts: object) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker;
-    const dirHandle = await picker({ mode: 'readwrite' });
+    const dirHandle = await (window as unknown as { showDirectoryPicker: (opts: object) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker({ mode: 'readwrite' });
 
     const albumDir = await dirHandle.getDirectoryHandle(spec.albumName, { create: true });
 
