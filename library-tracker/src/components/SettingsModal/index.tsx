@@ -53,6 +53,7 @@ export function SettingsModal({ onClose }: Props) {
   const [knownPublishers, setKnownPublishers] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const focusedInputRef = useRef<HTMLInputElement | null>(null);
   const focusedKeyRef = useRef<string | null>(null);
@@ -66,6 +67,7 @@ export function SettingsModal({ onClose }: Props) {
         });
         setKnownPublishers(pubs);
       })
+      .catch((e: unknown) => setLoadError((e as Error).message ?? 'Failed to load settings'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -117,7 +119,10 @@ export function SettingsModal({ onClose }: Props) {
     try {
       const templates: NamingTemplates = {};
       if (editState.default) templates.default = editState.default;
-      if (Object.keys(editState.publishers).length) templates.publishers = editState.publishers;
+      const nonEmptyPublishers = Object.fromEntries(
+        Object.entries(editState.publishers).filter(([, t]) => t.trim()),
+      );
+      if (Object.keys(nonEmptyPublishers).length) templates.publishers = nonEmptyPublishers;
       await saveSettings({ naming_templates: templates });
       onClose();
     } catch (e) {
@@ -203,6 +208,15 @@ export function SettingsModal({ onClose }: Props) {
           }}>
             File Naming Templates
           </div>
+
+          {loadError && (
+            <div style={{
+              background: '#fef0f0', border: '1px solid #f5b0b0', borderRadius: 8,
+              padding: '10px 14px', fontSize: 12.5, color: '#c44545', marginBottom: 12,
+            }}>
+              Failed to load settings: {loadError}
+            </div>
+          )}
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '24px 0', color: THEME.inkMuted, fontSize: 13 }}>
