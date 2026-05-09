@@ -17,6 +17,7 @@ type Props = {
   values: ReviewValues;
   onChange: (patch: Partial<ReviewValues>) => void;
   onSkipTitle: () => void;
+  fileNamingFromSettings?: boolean;
 };
 
 const fieldStyle: React.CSSProperties = {
@@ -30,11 +31,17 @@ const extractedStyle: React.CSSProperties = {
   borderColor: '#b8d4b0', background: '#f4fbf3', color: '#2a6e22',
 };
 
+const settingsStyle: React.CSSProperties = {
+  ...fieldStyle,
+  borderColor: '#c4b8a8',
+  background: '#f8f4ef',
+};
+
 function wasExtracted(value: string, parsedValue: string | null): boolean {
   return !!parsedValue && value === parsedValue;
 }
 
-export function ReviewFields({ parsed, values, onChange, onSkipTitle }: Props) {
+export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNamingFromSettings }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -114,13 +121,22 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle }: Props) {
         <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4 }}>
           <Label>File Naming System</Label>
           <input
-            style={wasExtracted(values.file_naming, parsed.file_naming) ? extractedStyle : fieldStyle}
+            style={
+              wasExtracted(values.file_naming, parsed.file_naming)
+                ? extractedStyle
+                : fileNamingFromSettings
+                ? settingsStyle
+                : fieldStyle
+            }
             value={values.file_naming}
             placeholder="Not found in brief"
             onChange={(e) => onChange({ file_naming: e.target.value })}
           />
           {parsed.file_naming && (
             <span style={{ fontSize: 10, color: THEME.inkMuted }}>Found in brief — edit if needed</span>
+          )}
+          {!parsed.file_naming && fileNamingFromSettings && (
+            <span style={{ fontSize: 10, color: THEME.inkMuted }}>From your settings — edit if needed</span>
           )}
         </div>
       </div>

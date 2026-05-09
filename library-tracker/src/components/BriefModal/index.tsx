@@ -9,6 +9,7 @@ import {
   createFoldersAsZip,
   type FolderSpec,
 } from '../../lib/folderCreation';
+import { fetchSettings } from '../../lib/settings';
 import { UploadZone } from './UploadZone';
 import { ReviewFields, type ReviewValues } from './ReviewFields';
 import { FolderBuilder, DEFAULT_FOLDERS } from './FolderBuilder';
@@ -44,6 +45,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
   const [folders, setFolders] = useState<string[]>(DEFAULT_FOLDERS);
   const [folderPath, setFolderPath] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fileNamingFromSettings, setFileNamingFromSettings] = useState(false);
 
   async function handleFile(file: File) {
     setParseError(null);
@@ -51,7 +53,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
     setStep('reading');
     try {
       const result = await parseBriefFile(file);
-      applyParsed(result);
+      await applyParsed(result);
     } catch (e) {
       setParseError((e as Error).message);
       setStep('upload');
@@ -64,15 +66,36 @@ export function BriefModal({ onClose, onCreated }: Props) {
     setStep('reading');
     try {
       const result = await parseBriefText(text);
-      applyParsed(result);
+      await applyParsed(result);
     } catch (e) {
       setParseError((e as Error).message);
       setStep('upload');
     }
   }
 
-  function applyParsed(result: ParsedBrief) {
+  async function applyParsed(result: ParsedBrief) {
+    let fileNaming = result.file_naming ?? '';
+    let fromSettings = false;
+
+    if (!fileNaming) {
+      try {
+        const s = await fetchSettings();
+        const t = s.naming_templates;
+        const publisherKey = result.publisher;
+        if (publisherKey && t.publishers?.[publisherKey]) {
+          fileNaming = t.publishers[publisherKey];
+          fromSettings = true;
+        } else if (t.default) {
+          fileNaming = t.default;
+          fromSettings = true;
+        }
+      } catch {
+        // settings unavailable — leave field empty
+      }
+    }
+
     setParsed(result);
+    setFileNamingFromSettings(fromSettings);
     setValues({
       code: result.code ?? '',
       version: 'v1.00',
@@ -80,7 +103,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
       publisher: result.publisher ?? '',
       due_date: result.due_date ?? '',
       fee: result.fee ?? '',
-      file_naming: result.file_naming ?? '',
+      file_naming: fileNaming,
       title: '',
     });
     setStep('review');
@@ -266,6 +289,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
                 values={values}
                 onChange={(patch) => setValues((v) => ({ ...v, ...patch }))}
                 onSkipTitle={handleSkipTitle}
+                fileNamingFromSettings={fileNamingFromSettings}
               />
 
               <div style={{ borderTop: `1px solid ${THEME.border}`, paddingTop: 20 }}>
