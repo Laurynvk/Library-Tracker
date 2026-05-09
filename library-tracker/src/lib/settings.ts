@@ -7,8 +7,11 @@ export type NamingTemplates = {
   publishers?: Record<string, string>;
 };
 
+export type Preferences = Record<string, unknown>;
+
 export type UserSettings = {
   naming_templates: NamingTemplates;
+  preferences: Preferences;
 };
 
 let cache: UserSettings | null = null;
@@ -17,20 +20,27 @@ export async function fetchSettings(): Promise<UserSettings> {
   if (cache) return cache;
   const { data, error } = await supabase
     .from('user_settings')
-    .select('naming_templates')
+    .select('naming_templates, preferences')
     .eq('user_id', USER_ID)
     .maybeSingle();
   if (error) throw error;
   cache = data
-    ? { naming_templates: data.naming_templates as NamingTemplates }
-    : { naming_templates: {} };
+    ? {
+        naming_templates: data.naming_templates as NamingTemplates,
+        preferences: (data.preferences ?? {}) as Preferences,
+      }
+    : { naming_templates: {}, preferences: {} };
   return cache;
 }
 
 export async function saveSettings(settings: UserSettings): Promise<void> {
   const { error } = await supabase
     .from('user_settings')
-    .upsert({ user_id: USER_ID, naming_templates: settings.naming_templates });
+    .upsert({
+      user_id: USER_ID,
+      naming_templates: settings.naming_templates,
+      preferences: settings.preferences,
+    });
   if (error) throw error;
   cache = settings;
 }
