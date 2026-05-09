@@ -132,7 +132,7 @@ export async function fetchPublisherNames(): Promise<string[]> {
 - [ ] **Step 4: Verify TypeScript compiles**
 
 ```bash
-cd library-tracker && npx tsc --noEmit
+cd library-tracker && npx tsc -b
 ```
 
 Expected: no errors.
@@ -251,7 +251,7 @@ export function fmtDate(s: string | null): string {
 - [ ] **Step 2: Verify TypeScript compiles**
 
 ```bash
-cd library-tracker && npx tsc --noEmit
+cd library-tracker && npx tsc -b
 ```
 
 Expected: no errors (THEME still exists as a named export, so existing consumers aren't broken yet).
@@ -762,7 +762,7 @@ export function SettingsModal({ onClose }: Props) {
 - [ ] **Step 2: Verify TypeScript compiles**
 
 ```bash
-cd library-tracker && npx tsc --noEmit
+cd library-tracker && npx tsc -b
 ```
 
 Expected: no errors.
@@ -994,7 +994,7 @@ export default function App() {
 - [ ] **Step 2: Verify TypeScript compiles**
 
 ```bash
-cd library-tracker && npx tsc --noEmit
+cd library-tracker && npx tsc -b
 ```
 
 Expected: no errors.
@@ -1245,7 +1245,7 @@ const THEME = useTheme();
 - [ ] **Step 13: Verify TypeScript compiles clean**
 
 ```bash
-cd library-tracker && npx tsc --noEmit
+cd library-tracker && npx tsc -b
 ```
 
 Expected: zero errors.
@@ -1340,7 +1340,7 @@ async function applyParsed(result: ParsedBrief) {
 - [ ] **Step 4: Verify TypeScript compiles**
 
 ```bash
-cd library-tracker && npx tsc --noEmit
+cd library-tracker && npx tsc -b
 ```
 
 Expected: no errors.
