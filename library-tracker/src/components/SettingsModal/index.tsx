@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { THEME } from '../../lib/theme';
+import { useTheme } from '../../lib/theme';
 import {
   fetchSettings,
   fetchPublisherNames,
@@ -10,13 +10,16 @@ import {
 type EditState = {
   default: string;
   publishers: Record<string, string>;
+  initials: string;
+  defaultVersion: string;
+  darkMode: boolean;
 };
 
 type AddForm = { name: string; template: string } | null;
 
 const TOKENS = ['{PROJECT}', '{ALBUM}', '{TITLE}', '{VERSION}', '{INITIALS}'];
 
-const PREVIEW_VALUES: Record<string, string> = {
+const BASE_PREVIEW_VALUES: Record<string, string> = {
   '{PROJECT}': 'ProjectName',
   '{ALBUM}': 'AlbumName',
   '{TITLE}': 'TrackTitle',
@@ -24,31 +27,35 @@ const PREVIEW_VALUES: Record<string, string> = {
   '{INITIALS}': 'LL',
 };
 
-function renderPreview(template: string): string {
-  return Object.entries(PREVIEW_VALUES).reduce(
+function renderPreview(template: string, previewValues: Record<string, string>): string {
+  return Object.entries(previewValues).reduce(
     (s, [token, val]) => s.replaceAll(token, val),
     template,
   );
 }
-
-const fieldStyle: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box',
-  padding: '6px 9px',
-  background: '#fff',
-  border: `1px solid ${THEME.border}`,
-  borderRadius: 5,
-  fontSize: 12,
-  fontFamily: THEME.mono,
-  color: THEME.ink,
-  outline: 'none',
-};
 
 type Props = {
   onClose: () => void;
 };
 
 export function SettingsModal({ onClose }: Props) {
-  const [editState, setEditState] = useState<EditState>({ default: '', publishers: {} });
+  const THEME = useTheme();
+
+  const fieldStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    padding: '6px 9px',
+    background: THEME.surface,
+    border: `1px solid ${THEME.border}`,
+    borderRadius: 5,
+    fontSize: 12,
+    fontFamily: THEME.mono,
+    color: THEME.ink,
+    outline: 'none',
+  };
+
+  const [editState, setEditState] = useState<EditState>({
+    default: '', publishers: {}, initials: '', defaultVersion: '', darkMode: false,
+  });
   const [addForm, setAddForm] = useState<AddForm>(null);
   const [knownPublishers, setKnownPublishers] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -64,12 +71,20 @@ export function SettingsModal({ onClose }: Props) {
         setEditState({
           default: s.naming_templates.default ?? '',
           publishers: { ...(s.naming_templates.publishers ?? {}) },
+          initials: s.initials ?? '',
+          defaultVersion: s.default_version ?? '',
+          darkMode: s.dark_mode ?? false,
         });
         setKnownPublishers(pubs);
       })
       .catch((e: unknown) => setLoadError((e as Error).message ?? 'Failed to load settings'))
       .finally(() => setLoading(false));
   }, []);
+
+  const previewValues: Record<string, string> = {
+    ...BASE_PREVIEW_VALUES,
+    '{INITIALS}': editState.initials || 'LL',
+  };
 
   function trackFocus(key: string, e: React.FocusEvent<HTMLInputElement>) {
     focusedInputRef.current = e.currentTarget;
@@ -123,7 +138,12 @@ export function SettingsModal({ onClose }: Props) {
         Object.entries(editState.publishers).filter(([, t]) => t.trim()),
       );
       if (Object.keys(nonEmptyPublishers).length) templates.publishers = nonEmptyPublishers;
-      await saveSettings({ naming_templates: templates });
+      await saveSettings({
+        naming_templates: templates,
+        initials: editState.initials || undefined,
+        default_version: editState.defaultVersion || undefined,
+        dark_mode: editState.darkMode || undefined,
+      });
       onClose();
     } catch (e) {
       alert('Failed to save settings: ' + (e as Error).message);
@@ -159,7 +179,7 @@ export function SettingsModal({ onClose }: Props) {
       <div style={{ marginTop: 6, fontSize: 10.5, color: THEME.inkMuted }}>
         Preview:{' '}
         <span style={{ fontFamily: THEME.mono, color: THEME.ink }}>
-          {renderPreview(template)}
+          {renderPreview(template, previewValues)}
         </span>
       </div>
     );
@@ -201,14 +221,6 @@ export function SettingsModal({ onClose }: Props) {
         {/* Body */}
         <div style={{ padding: '20px 22px', maxHeight: '70vh', overflowY: 'auto' }}>
 
-          {/* Section heading */}
-          <div style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
-            textTransform: 'uppercase', color: THEME.inkMuted, marginBottom: 12,
-          }}>
-            File Naming Templates
-          </div>
-
           {loadError && (
             <div style={{
               background: '#fef0f0', border: '1px solid #f5b0b0', borderRadius: 8,
@@ -223,141 +235,213 @@ export function SettingsModal({ onClose }: Props) {
               Loading…
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              {/* Default card — green-tinted */}
-              <div style={{
-                background: '#f4fbf3', border: '1px solid #b8d4b0',
-                borderRadius: 8, padding: '12px 14px',
-              }}>
+              {/* ── General ─────────────────────────────── */}
+              <div>
                 <div style={{
-                  fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8,
-                  textTransform: 'uppercase', color: '#2a6e22', marginBottom: 8,
+                  fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
+                  textTransform: 'uppercase', color: THEME.inkMuted, marginBottom: 12,
                 }}>
-                  Your Default
+                  General
                 </div>
-                <input
-                  style={{ ...fieldStyle, borderColor: '#b8d4b0', background: '#fff' }}
-                  value={editState.default}
-                  placeholder="e.g. {PUBLISHER}_{ALBUM}_{TITLE}_{VERSION}"
-                  onChange={(e) => setEditState((s) => ({ ...s, default: e.target.value }))}
-                  onFocus={(e) => trackFocus('default', e)}
-                />
-                {TokenChips()}
-                {PreviewLine({ template: editState.default })}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                  {/* Initials */}
+                  <div>
+                    <label style={{ fontSize: 11.5, fontWeight: 600, color: THEME.ink, display: 'block', marginBottom: 4 }}>
+                      Your Initials
+                    </label>
+                    <input
+                      style={{ ...fieldStyle, maxWidth: 100 }}
+                      value={editState.initials}
+                      placeholder="e.g. LL"
+                      maxLength={8}
+                      onChange={(e) => setEditState((s) => ({ ...s, initials: e.target.value }))}
+                    />
+                    <div style={{ fontSize: 10.5, color: THEME.inkMuted, marginTop: 4 }}>
+                      Used as <span style={{ fontFamily: THEME.mono }}>{'{INITIALS}'}</span> in file naming templates
+                    </div>
+                  </div>
+
+                  {/* Default Version */}
+                  <div>
+                    <label style={{ fontSize: 11.5, fontWeight: 600, color: THEME.ink, display: 'block', marginBottom: 4 }}>
+                      Default Version
+                    </label>
+                    <input
+                      style={{ ...fieldStyle, maxWidth: 120 }}
+                      value={editState.defaultVersion}
+                      placeholder="v1.00"
+                      onChange={(e) => setEditState((s) => ({ ...s, defaultVersion: e.target.value }))}
+                    />
+                    <div style={{ fontSize: 10.5, color: THEME.inkMuted, marginTop: 4 }}>
+                      Starting version when you create a new brief
+                    </div>
+                  </div>
+
+                  {/* Dark Mode */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      id="dark-mode-toggle"
+                      type="checkbox"
+                      checked={editState.darkMode}
+                      onChange={(e) => setEditState((s) => ({ ...s, darkMode: e.target.checked }))}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <label
+                      htmlFor="dark-mode-toggle"
+                      style={{ fontSize: 11.5, fontWeight: 600, color: THEME.ink, cursor: 'pointer' }}
+                    >
+                      Dark Mode
+                    </label>
+                  </div>
+
+                </div>
               </div>
 
-              {/* Per-publisher cards */}
-              {Object.entries(editState.publishers).map(([name, template]) => (
-                <div key={name} style={{
-                  background: THEME.surfaceAlt, border: `1px solid ${THEME.border}`,
-                  borderRadius: 8, padding: '12px 14px',
-                }}>
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between',
-                    alignItems: 'center', marginBottom: 8,
-                  }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: THEME.ink }}>{name}</span>
-                    <button
-                      onClick={() => removePublisher(name)}
-                      style={{
-                        background: 'transparent', border: 'none', cursor: 'pointer',
-                        fontSize: 11, color: THEME.inkMuted, padding: 0, fontFamily: THEME.sans,
-                      }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <input
-                    style={fieldStyle}
-                    value={template}
-                    placeholder="e.g. {CODE}_{TITLE}_{VERSION}"
-                    onChange={(e) =>
-                      setEditState((s) => ({
-                        ...s,
-                        publishers: { ...s.publishers, [name]: e.target.value },
-                      }))
-                    }
-                    onFocus={(e) => trackFocus(name, e)}
-                  />
-                  {TokenChips()}
-                  {PreviewLine({ template })}
-                </div>
-              ))}
-
-              {/* Add publisher form or button */}
-              {addForm === null ? (
-                <button
-                  onClick={() => setAddForm({ name: '', template: '' })}
-                  style={{
-                    background: 'transparent', border: `1px dashed ${THEME.border}`,
-                    borderRadius: 8, padding: '10px 14px',
-                    fontSize: 12, color: THEME.inkMuted, cursor: 'pointer',
-                    fontFamily: THEME.sans, textAlign: 'left', width: '100%',
-                  }}
-                >
-                  + Add publisher…
-                </button>
-              ) : (
+              {/* ── File Naming Templates ────────────────── */}
+              <div>
                 <div style={{
-                  background: THEME.surfaceAlt, border: `1px solid ${THEME.border}`,
-                  borderRadius: 8, padding: '12px 14px',
+                  fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
+                  textTransform: 'uppercase', color: THEME.inkMuted, marginBottom: 12,
                 }}>
-                  <div style={{
-                    fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8,
-                    textTransform: 'uppercase', color: THEME.inkMuted, marginBottom: 8,
-                  }}>
-                    New Publisher
-                  </div>
-
-                  {/* datalist for auto-suggest */}
-                  <datalist id="known-publishers">
-                    {knownPublishers.map((p) => <option key={p} value={p} />)}
-                  </datalist>
-
-                  <input
-                    list="known-publishers"
-                    style={{ ...fieldStyle, marginBottom: 8 }}
-                    value={addForm.name}
-                    placeholder="Publisher name…"
-                    onChange={(e) => setAddForm((f) => f ? { ...f, name: e.target.value } : f)}
-                  />
-                  <input
-                    style={fieldStyle}
-                    value={addForm.template}
-                    placeholder="e.g. {CODE}_{TITLE}_{VERSION}"
-                    onChange={(e) => setAddForm((f) => f ? { ...f, template: e.target.value } : f)}
-                    onFocus={(e) => trackFocus('__add__', e)}
-                  />
-                  {TokenChips()}
-                  {PreviewLine({ template: addForm.template })}
-
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button
-                      onClick={commitAddForm}
-                      disabled={!addForm.name.trim()}
-                      style={{
-                        padding: '6px 14px', background: THEME.accent, color: '#fff',
-                        border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600,
-                        cursor: addForm.name.trim() ? 'pointer' : 'not-allowed',
-                        fontFamily: THEME.sans, opacity: addForm.name.trim() ? 1 : 0.5,
-                      }}
-                    >
-                      Add
-                    </button>
-                    <button
-                      onClick={() => setAddForm(null)}
-                      style={{
-                        padding: '6px 14px', background: 'transparent', color: THEME.inkMuted,
-                        border: `1px solid ${THEME.border}`, borderRadius: 5,
-                        fontSize: 12, cursor: 'pointer', fontFamily: THEME.sans,
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  File Naming Templates
                 </div>
-              )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                  {/* Default card */}
+                  <div style={{
+                    background: '#f4fbf3', border: '1px solid #b8d4b0',
+                    borderRadius: 8, padding: '12px 14px',
+                  }}>
+                    <div style={{
+                      fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8,
+                      textTransform: 'uppercase', color: '#2a6e22', marginBottom: 8,
+                    }}>
+                      Your Default
+                    </div>
+                    <input
+                      style={{ ...fieldStyle, borderColor: '#b8d4b0', background: '#fff' }}
+                      value={editState.default}
+                      placeholder="e.g. {PROJECT}_{ALBUM}_{TITLE}_{VERSION}"
+                      onChange={(e) => setEditState((s) => ({ ...s, default: e.target.value }))}
+                      onFocus={(e) => trackFocus('default', e)}
+                    />
+                    {TokenChips()}
+                    {PreviewLine({ template: editState.default })}
+                  </div>
+
+                  {/* Per-publisher cards */}
+                  {Object.entries(editState.publishers).map(([name, template]) => (
+                    <div key={name} style={{
+                      background: THEME.surfaceAlt, border: `1px solid ${THEME.border}`,
+                      borderRadius: 8, padding: '12px 14px',
+                    }}>
+                      <div style={{
+                        display: 'flex', justifyContent: 'space-between',
+                        alignItems: 'center', marginBottom: 8,
+                      }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: THEME.ink }}>{name}</span>
+                        <button
+                          onClick={() => removePublisher(name)}
+                          style={{
+                            background: 'transparent', border: 'none', cursor: 'pointer',
+                            fontSize: 11, color: THEME.inkMuted, padding: 0, fontFamily: THEME.sans,
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <input
+                        style={fieldStyle}
+                        value={template}
+                        placeholder="e.g. {PROJECT}_{TITLE}_{VERSION}"
+                        onChange={(e) =>
+                          setEditState((s) => ({
+                            ...s,
+                            publishers: { ...s.publishers, [name]: e.target.value },
+                          }))
+                        }
+                        onFocus={(e) => trackFocus(name, e)}
+                      />
+                      {TokenChips()}
+                      {PreviewLine({ template })}
+                    </div>
+                  ))}
+
+                  {/* Add publisher */}
+                  {addForm === null ? (
+                    <button
+                      onClick={() => setAddForm({ name: '', template: '' })}
+                      style={{
+                        background: 'transparent', border: `1px dashed ${THEME.border}`,
+                        borderRadius: 8, padding: '10px 14px',
+                        fontSize: 12, color: THEME.inkMuted, cursor: 'pointer',
+                        fontFamily: THEME.sans, textAlign: 'left', width: '100%',
+                      }}
+                    >
+                      + Add publisher…
+                    </button>
+                  ) : (
+                    <div style={{
+                      background: THEME.surfaceAlt, border: `1px solid ${THEME.border}`,
+                      borderRadius: 8, padding: '12px 14px',
+                    }}>
+                      <div style={{
+                        fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8,
+                        textTransform: 'uppercase', color: THEME.inkMuted, marginBottom: 8,
+                      }}>
+                        New Publisher
+                      </div>
+                      <datalist id="known-publishers">
+                        {knownPublishers.map((p) => <option key={p} value={p} />)}
+                      </datalist>
+                      <input
+                        list="known-publishers"
+                        style={{ ...fieldStyle, marginBottom: 8 }}
+                        value={addForm.name}
+                        placeholder="Publisher name…"
+                        onChange={(e) => setAddForm((f) => f ? { ...f, name: e.target.value } : f)}
+                      />
+                      <input
+                        style={fieldStyle}
+                        value={addForm.template}
+                        placeholder="e.g. {PROJECT}_{TITLE}_{VERSION}"
+                        onChange={(e) => setAddForm((f) => f ? { ...f, template: e.target.value } : f)}
+                        onFocus={(e) => trackFocus('__add__', e)}
+                      />
+                      {TokenChips()}
+                      {PreviewLine({ template: addForm.template })}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                        <button
+                          onClick={commitAddForm}
+                          disabled={!addForm.name.trim()}
+                          style={{
+                            padding: '6px 14px', background: THEME.accent, color: '#fff',
+                            border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600,
+                            cursor: addForm.name.trim() ? 'pointer' : 'not-allowed',
+                            fontFamily: THEME.sans, opacity: addForm.name.trim() ? 1 : 0.5,
+                          }}
+                        >
+                          Add
+                        </button>
+                        <button
+                          onClick={() => setAddForm(null)}
+                          style={{
+                            padding: '6px 14px', background: 'transparent', color: THEME.inkMuted,
+                            border: `1px solid ${THEME.border}`, borderRadius: 5,
+                            fontSize: 12, cursor: 'pointer', fontFamily: THEME.sans,
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           )}
         </div>
