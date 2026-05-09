@@ -3,6 +3,12 @@ import { useState } from 'react';
 import { THEME } from '../../lib/theme';
 import { parseBriefFile, parseBriefText, type ParsedBrief } from '../../lib/parseBrief';
 import { createTrack } from '../../lib/tracks';
+import {
+  isFileSystemAccessSupported,
+  createFoldersOnDesktop,
+  createFoldersAsZip,
+  type FolderSpec,
+} from '../../lib/folderCreation';
 import { UploadZone } from './UploadZone';
 import { ReviewFields, type ReviewValues } from './ReviewFields';
 import { FolderBuilder, DEFAULT_FOLDERS } from './FolderBuilder';
@@ -87,6 +93,21 @@ export function BriefModal({ onClose, onCreated }: Props) {
   async function handleApprove() {
     setSaving(true);
     try {
+      // Create folders if user hasn't already done so via the builder buttons
+      let resolvedPath = folderPath;
+      if (!resolvedPath) {
+        const spec: FolderSpec = {
+          albumName: values.album || 'New Album',
+          topLevelFolders: folders,
+          trackTitle: values.title || null,
+        };
+        if (isFileSystemAccessSupported()) {
+          resolvedPath = await createFoldersOnDesktop(spec);
+        } else {
+          await createFoldersAsZip(spec);
+        }
+      }
+
       const track = await createTrack({
         code: values.code || null,
         version: values.version || 'v1.00',
@@ -100,7 +121,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
         status: 'brief',
         invoice: 'unpaid',
         brief_link: null,
-        folder_path: folderPath,
+        folder_path: resolvedPath,
         brief_parsed_at: new Date().toISOString(),
         collaborators: [],
         notes: null,
@@ -108,6 +129,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
       onCreated(track);
       onClose();
     } catch (e) {
+      if ((e as Error).name === 'AbortError') return; // user cancelled folder picker
       alert('Failed to create project: ' + (e as Error).message);
     } finally {
       setSaving(false);
