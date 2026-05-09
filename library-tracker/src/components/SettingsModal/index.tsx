@@ -14,13 +14,14 @@ type EditState = {
 
 type AddForm = { name: string; template: string } | null;
 
-const TOKENS = ['{PROJECT}', '{ALBUM}', '{TITLE}', '{VERSION}'];
+const TOKENS = ['{PROJECT}', '{ALBUM}', '{TITLE}', '{VERSION}', '{INITIALS}'];
 
 const PREVIEW_VALUES: Record<string, string> = {
   '{PROJECT}': 'ProjectName',
   '{ALBUM}': 'AlbumName',
   '{TITLE}': 'TrackTitle',
   '{VERSION}': 'v1.00',
+  '{INITIALS}': 'LL',
 };
 
 function renderPreview(template: string): string {
