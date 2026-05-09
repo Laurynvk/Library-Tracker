@@ -173,13 +173,20 @@ export function BriefModal({ onClose, onCreated }: Props) {
 
         {/* Step indicator */}
         <div style={{
-          display: 'flex', alignItems: 'center', padding: '10px 24px',
-          background: THEME.surfaceAlt, borderBottom: `1px solid ${THEME.border}`,
-          gap: 0,
+          position: 'relative', display: 'flex', alignItems: 'center',
+          padding: '10px 24px', background: THEME.surfaceAlt,
+          borderBottom: `1px solid ${THEME.border}`,
         }}>
+          {/* connector line behind steps */}
+          <div style={{ position: 'absolute', left: 24, right: 24, height: 1, background: THEME.border }} />
           {STEPS.map((s, i) => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+            <div key={s.id} style={{
+              flex: 1, display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 1,
+            }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+                background: THEME.surfaceAlt, padding: '0 6px',
+              }}>
                 <div style={{
                   width: 18, height: 18, borderRadius: '50%', fontSize: 9, fontWeight: 700,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -195,9 +202,6 @@ export function BriefModal({ onClose, onCreated }: Props) {
                   {s.label}
                 </span>
               </div>
-              {i < STEPS.length - 1 && (
-                <div style={{ flex: 1, height: 1, background: THEME.border, margin: '0 12px' }} />
-              )}
             </div>
           ))}
         </div>
