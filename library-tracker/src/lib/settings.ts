@@ -7,11 +7,17 @@ export type NamingTemplates = {
   publishers?: Record<string, string>;
 };
 
-export type Preferences = Record<string, unknown>;
+export type Preferences = {
+  initials?: string;
+  default_version?: string;
+  dark_mode?: boolean;
+};
 
 export type UserSettings = {
   naming_templates: NamingTemplates;
-  preferences: Preferences;
+  initials?: string;
+  default_version?: string;
+  dark_mode?: boolean;
 };
 
 let cache: UserSettings | null = null;
@@ -24,23 +30,26 @@ export async function fetchSettings(): Promise<UserSettings> {
     .eq('user_id', USER_ID)
     .maybeSingle();
   if (error) throw error;
+  const prefs = (data?.preferences ?? {}) as Preferences;
   cache = data
     ? {
         naming_templates: data.naming_templates as NamingTemplates,
-        preferences: (data.preferences ?? {}) as Preferences,
+        ...prefs,
       }
-    : { naming_templates: {}, preferences: {} };
+    : { naming_templates: {} };
   return cache;
 }
 
 export async function saveSettings(settings: UserSettings): Promise<void> {
+  const { naming_templates, initials, default_version, dark_mode } = settings;
+  const preferences: Preferences = {};
+  if (initials !== undefined) preferences.initials = initials;
+  if (default_version !== undefined) preferences.default_version = default_version;
+  if (dark_mode !== undefined) preferences.dark_mode = dark_mode;
+
   const { error } = await supabase
     .from('user_settings')
-    .upsert({
-      user_id: USER_ID,
-      naming_templates: settings.naming_templates,
-      preferences: settings.preferences,
-    });
+    .upsert({ user_id: USER_ID, naming_templates, preferences });
   if (error) throw error;
   cache = settings;
 }
