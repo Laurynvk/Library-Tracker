@@ -5,6 +5,7 @@ import { updateTrack } from '../../lib/tracks';
 import type { Track } from '../../types/track';
 import { ActivityFeed } from './ActivityFeed';
 import { DrawerField } from './DrawerField';
+import { CopyIconButton } from '../CopyIconButton';
 
 type Props = {
   track: Track | null;
@@ -351,6 +352,31 @@ export function TrackDrawer({ track, onClose, onSave }: Props) {
               onChange={(e) => set('brief_link', e.target.value || null)}
               style={INPUT_STYLE}
             />
+          </DrawerField>
+
+          {/* File Naming System */}
+          <DrawerField label="File Naming System">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{
+                flex: 1,
+                background: THEME.surfaceAlt,
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 4,
+                padding: '6px 9px',
+                fontSize: 12,
+                color: draft.file_naming ? THEME.inkSoft : THEME.inkMuted,
+                fontFamily: THEME.mono,
+                fontStyle: draft.file_naming ? 'normal' : 'italic',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {draft.file_naming ?? 'Not set'}
+              </div>
+              {draft.file_naming && (
+                <CopyIconButton value={draft.file_naming} title="Copy file naming system" size={13} />
+              )}
+            </div>
           </DrawerField>
 
           {/* Notes */}

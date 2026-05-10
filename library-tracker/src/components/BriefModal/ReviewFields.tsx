@@ -1,5 +1,6 @@
 import { useTheme } from '../../lib/theme';
 import type { ParsedBrief } from '../../lib/parseBrief';
+import { CopyIconButton } from '../CopyIconButton';
 
 export interface ReviewValues {
   code: string;
@@ -122,18 +123,24 @@ export function ReviewFields({ parsed, values, onChange, onSkipTitle, fileNaming
         {/* File naming — full width */}
         <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4 }}>
           <Label THEME={THEME}>File Naming System</Label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <input
-            style={
-              wasExtracted(values.file_naming, parsed.file_naming)
+            style={{
+              ...(wasExtracted(values.file_naming, parsed.file_naming)
                 ? extractedStyle
                 : fileNamingFromSettings
                 ? settingsStyle
-                : fieldStyle
-            }
+                : fieldStyle),
+              flex: 1,
+            }}
             value={values.file_naming}
             placeholder="Not found in brief"
             onChange={(e) => onChange({ file_naming: e.target.value })}
           />
+          {values.file_naming && (
+            <CopyIconButton value={values.file_naming} title="Copy file naming system" size={13} />
+          )}
+          </div>
           {parsed.file_naming && (
             <span style={{ fontSize: 10, color: THEME.inkMuted }}>Found in brief — edit if needed</span>
           )}

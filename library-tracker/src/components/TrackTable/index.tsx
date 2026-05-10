@@ -11,6 +11,7 @@ import { useTheme, fmtMoney, fmtDate } from '../../lib/theme';
 import type { Track, InvoiceStatus } from '../../types/track';
 import { StatusPill } from './StatusPill';
 import { InvoiceBadge } from './InvoiceBadge';
+import { CopyIconButton } from '../CopyIconButton';
 
 type Props = {
   tracks: Track[];
@@ -201,6 +202,22 @@ function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: strin
   );
 }
 
+function TitleWithCopy({ title, fileNaming, onCommit }: { title: string; fileNaming: string | null; onCommit: (v: string) => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, width: '100%' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <EditableTitle value={title} onCommit={onCommit} />
+      {hovered && fileNaming && (
+        <CopyIconButton value={fileNaming} title="Copy file naming system" size={12} />
+      )}
+    </div>
+  );
+}
+
 function parseSplits(collaborators: string[]): { initials: string; pct: number | null }[] {
   return collaborators.map((c) => {
     const [initials, pct] = c.split(':');
@@ -259,8 +276,9 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
       col.accessor('title', {
         header: 'Track Title',
         cell: (i) => (
-          <EditableTitle
-            value={i.getValue()}
+          <TitleWithCopy
+            title={i.getValue()}
+            fileNaming={i.row.original.file_naming}
             onCommit={(title) => i.table.options.meta?.onUpdateTitle(i.row.original.id, title)}
           />
         ),
