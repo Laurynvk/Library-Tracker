@@ -21,6 +21,8 @@ type Props = {
   onUpdateCode: (id: string, code: string | null) => void;
   onRowClick: (track: Track) => void;
   selectedTrackId?: string;
+  userInitials?: string;
+  defaultVersion?: string;
 };
 
 function EditableCode({ value, onCommit }: { value: string | null; onCommit: (v: string | null) => void }) {
@@ -225,11 +227,18 @@ function parseSplits(collaborators: string[]): { initials: string; pct: number |
   });
 }
 
-function formatSplitsInline(collaborators: string[]): string {
-  if (!collaborators.length) return '—';
-  return parseSplits(collaborators)
-    .map(({ initials, pct }) => pct != null ? `${initials} ${pct}%` : initials)
-    .join(' / ');
+function formatSplitsInline(collaborators: string[], userInitials?: string): string {
+  const splits = parseSplits(collaborators);
+  const hasUser = userInitials && splits.some((s) => s.initials === userInitials);
+  const parts: string[] = [];
+  if (userInitials && !hasUser) parts.push(userInitials);
+  splits.forEach(({ initials, pct }) => parts.push(pct != null ? `${initials} ${pct}%` : initials));
+  return parts.length ? parts.join(' / ') : '—';
+}
+
+function normalizeVersion(raw: string, defaultVersion?: string): string {
+  const v = raw || defaultVersion || 'v1.00';
+  return v.startsWith('v') ? v : `v${v}`;
 }
 
 const col = createColumnHelper<Track>();
@@ -257,7 +266,7 @@ declare module '@tanstack/react-table' {
   }
 }
 
-export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId }: Props) {
+export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId, userInitials, defaultVersion }: Props) {
   const THEME = useTheme();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
 
@@ -287,7 +296,7 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
         header: 'Version',
         cell: (i) => (
           <EditableVersion
-            value={i.getValue() || 'v1.00'}
+            value={normalizeVersion(i.getValue(), defaultVersion)}
             onCommit={(version) => i.table.options.meta?.onUpdateVersion(i.row.original.id, version)}
           />
         ),
@@ -348,13 +357,13 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
             fontFamily: THEME.mono,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block',
           }}>
-            {formatSplitsInline(i.getValue())}
+            {formatSplitsInline(i.getValue(), userInitials)}
           </span>
         ),
         enableSorting: false,
       }),
     ],
-    [THEME],
+    [THEME, userInitials, defaultVersion],
   );
 
   const table = useReactTable({

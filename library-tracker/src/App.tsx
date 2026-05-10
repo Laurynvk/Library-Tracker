@@ -30,21 +30,25 @@ export default function App() {
   const [briefOpen, setBriefOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [userInitials, setUserInitials] = useState<string | undefined>(undefined);
+  const [defaultVersion, setDefaultVersion] = useState<string | undefined>(undefined);
+
+  function applySettings(s: Awaited<ReturnType<typeof fetchSettings>>) {
+    setDarkMode(s.dark_mode ?? false);
+    setUserInitials(s.initials);
+    setDefaultVersion(s.default_version);
+  }
 
   useEffect(() => {
     fetchTracks()
       .then(setTracks)
       .catch((e) => setError(e.message));
-    fetchSettings()
-      .then((s) => setDarkMode(s.dark_mode ?? false))
-      .catch(() => {});
+    fetchSettings().then(applySettings).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!settingsOpen) {
-      fetchSettings()
-        .then((s) => setDarkMode(s.dark_mode ?? false))
-        .catch(() => {});
+      fetchSettings().then(applySettings).catch(() => {});
     }
   }, [settingsOpen]);
 
@@ -173,6 +177,8 @@ export default function App() {
           onUpdateCode={handleUpdateCode}
           onRowClick={handleSelectTrack}
           selectedTrackId={selectedTrack?.id}
+          userInitials={userInitials}
+          defaultVersion={defaultVersion}
         />
         <Footer tracks={tracks} />
         <TrackDrawer
