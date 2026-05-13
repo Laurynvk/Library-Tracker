@@ -36,9 +36,11 @@ function renderPreview(template: string, previewValues: Record<string, string>):
 
 type Props = {
   onClose: () => void;
+  onImportClick: () => void;
+  onExportClick: () => void;
 };
 
-export function SettingsModal({ onClose }: Props) {
+export function SettingsModal({ onClose, onImportClick, onExportClick }: Props) {
   const THEME = useTheme();
 
   const fieldStyle: React.CSSProperties = {
@@ -236,6 +238,45 @@ export function SettingsModal({ onClose }: Props) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* ── Data ────────────────────────────────── */}
+              <div>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
+                  textTransform: 'uppercase', color: THEME.inkMuted, marginBottom: 12,
+                }}>
+                  Data
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => { onClose(); onImportClick(); }}
+                    style={{
+                      padding: '8px 14px',
+                      background: THEME.surfaceAlt,
+                      border: `1px solid ${THEME.border}`,
+                      borderRadius: 6, fontSize: 12, fontWeight: 500,
+                      cursor: 'pointer', color: THEME.ink, fontFamily: THEME.sans,
+                    }}
+                  >
+                    ↑ Import CSV
+                  </button>
+                  <button
+                    onClick={() => { onExportClick(); onClose(); }}
+                    style={{
+                      padding: '8px 14px',
+                      background: THEME.surfaceAlt,
+                      border: `1px solid ${THEME.border}`,
+                      borderRadius: 6, fontSize: 12, fontWeight: 500,
+                      cursor: 'pointer', color: THEME.ink, fontFamily: THEME.sans,
+                    }}
+                  >
+                    ↓ Export CSV
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: THEME.inkMuted, marginTop: 8 }}>
+                  Export downloads all your tracks as a .csv file you can open in any spreadsheet app.
+                </div>
+              </div>
 
               {/* ── General ─────────────────────────────── */}
               <div>
