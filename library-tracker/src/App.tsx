@@ -10,6 +10,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { THEME, DARK_THEME, ThemeContext } from './lib/theme';
 import { fetchSettings } from './lib/settings';
 import type { Track, InvoiceStatus } from './types/track';
+import { ImportModal } from './components/ImportModal';
+import { tracksToCSV, downloadCSV } from './lib/csvExport';
 
 function bumpVersion(v: string): string {
   const match = v.match(/^v(\d+)\.(\d+)$/);
@@ -32,6 +34,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [userInitials, setUserInitials] = useState<string | undefined>(undefined);
   const [defaultVersion, setDefaultVersion] = useState<string | undefined>(undefined);
+  const [importOpen, setImportOpen] = useState(false);
 
   function applySettings(s: Awaited<ReturnType<typeof fetchSettings>>) {
     setDarkMode(s.dark_mode ?? false);
@@ -138,6 +141,16 @@ export default function App() {
     setTracks((prev) => [track, ...prev]);
   }
 
+  function handleImported(newTracks: Track[]) {
+    setTracks((prev) => [...prev, ...newTracks]);
+    setImportOpen(false);
+  }
+
+  function handleExport() {
+    const filename = `library-tracker-export-${new Date().toISOString().split('T')[0]}.csv`;
+    downloadCSV(filename, tracksToCSV(tracks));
+  }
+
   if (error) {
     return (
       <div style={{ padding: 40, fontFamily: theme.sans, color: '#c44545' }}>
@@ -179,6 +192,8 @@ export default function App() {
           selectedTrackId={selectedTrack?.id}
           userInitials={userInitials}
           defaultVersion={defaultVersion}
+          onImportClick={() => setImportOpen(true)}
+          totalTrackCount={tracks.length}
         />
         <Footer tracks={tracks} />
         <TrackDrawer
@@ -201,7 +216,17 @@ export default function App() {
           />
         )}
         {settingsOpen && (
-          <SettingsModal onClose={() => setSettingsOpen(false)} />
+          <SettingsModal
+            onClose={() => setSettingsOpen(false)}
+            onImportClick={() => { setSettingsOpen(false); setImportOpen(true); }}
+            onExport={handleExport}
+          />
+        )}
+        {importOpen && (
+          <ImportModal
+            onClose={() => setImportOpen(false)}
+            onImported={handleImported}
+          />
         )}
       </div>
     </ThemeContext.Provider>
