@@ -143,7 +143,8 @@ export default function App() {
 
   function handleImported(newTracks: Track[]) {
     setTracks((prev) => [...prev, ...newTracks]);
-    setImportOpen(false);
+    // Don't close the modal here — ImportModal transitions to its done step
+    // and the user closes it via "Go to my tracks →" (which calls onClose)
   }
 
   function handleExport() {
