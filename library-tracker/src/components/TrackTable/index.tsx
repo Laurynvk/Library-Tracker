@@ -23,6 +23,8 @@ type Props = {
   selectedTrackId?: string;
   userInitials?: string;
   defaultVersion?: string;
+  onImportClick?: () => void;
+  totalTrackCount?: number;
 };
 
 function EditableCode({ value, onCommit }: { value: string | null; onCommit: (v: string | null) => void }) {
@@ -266,7 +268,7 @@ declare module '@tanstack/react-table' {
   }
 }
 
-export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId, userInitials, defaultVersion }: Props) {
+export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId, userInitials, defaultVersion, onImportClick, totalTrackCount }: Props) {
   const THEME = useTheme();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
 
@@ -452,13 +454,43 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
       ))}
 
       {tracks.length === 0 && (
-        <div style={{
-          padding: 60, textAlign: 'center',
-          color: THEME.inkMuted, fontSize: 13,
-          fontFamily: THEME.sans,
-        }}>
-          No tracks match this filter.
-        </div>
+        totalTrackCount === 0 ? (
+          // True empty state — no tracks at all, show import prompt
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', padding: '80px 24px',
+            fontFamily: THEME.sans,
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 16 }}>📂</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: THEME.ink, marginBottom: 6 }}>
+              No tracks yet
+            </div>
+            <div style={{ fontSize: 13, color: THEME.inkMuted, marginBottom: 24, textAlign: 'center', maxWidth: 280 }}>
+              Bring in your existing spreadsheet or start fresh
+            </div>
+            {onImportClick && (
+              <button
+                onClick={onImportClick}
+                style={{
+                  padding: '9px 18px', background: THEME.accent, color: '#fff',
+                  border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: THEME.sans,
+                }}
+              >
+                ↑ Import CSV
+              </button>
+            )}
+          </div>
+        ) : (
+          // Filtered empty state — tracks exist but none match filter
+          <div style={{
+            padding: 60, textAlign: 'center',
+            color: THEME.inkMuted, fontSize: 13,
+            fontFamily: THEME.sans,
+          }}>
+            No tracks match this filter.
+          </div>
+        )
       )}
     </div>
   );
