@@ -37,10 +37,10 @@ function renderPreview(template: string, previewValues: Record<string, string>):
 type Props = {
   onClose: () => void;
   onImportClick: () => void;
-  onExportClick: () => void;
+  onExport: () => void;
 };
 
-export function SettingsModal({ onClose, onImportClick, onExportClick }: Props) {
+export function SettingsModal({ onClose, onImportClick, onExport }: Props) {
   const THEME = useTheme();
 
   const fieldStyle: React.CSSProperties = {
@@ -261,7 +261,7 @@ export function SettingsModal({ onClose, onImportClick, onExportClick }: Props) 
                     ↑ Import CSV
                   </button>
                   <button
-                    onClick={() => { onExportClick(); onClose(); }}
+                    onClick={() => { onExport(); onClose(); }}
                     style={{
                       padding: '8px 14px',
                       background: THEME.surfaceAlt,
