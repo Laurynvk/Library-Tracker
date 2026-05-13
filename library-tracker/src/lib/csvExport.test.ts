@@ -58,4 +58,22 @@ describe('tracksToCSV', () => {
     const csv = tracksToCSV([{ ...track, title: 'Hello, World' }]);
     expect(csv).toContain('"Hello, World"');
   });
+
+  it('wraps values containing quotes in double-quotes and doubles internal quotes', () => {
+    const csv = tracksToCSV([{ ...track, title: 'Say "Hello"' }]);
+    expect(csv).toContain('"Say ""Hello"""');
+  });
+
+  it('wraps values containing newlines in double-quotes', () => {
+    const csv = tracksToCSV([{ ...track, notes: 'line1\nline2' }]);
+    expect(csv).toContain('"line1\nline2"');
+  });
+
+  it('outputs empty string for null values', () => {
+    const csv = tracksToCSV([{ ...track, code: null, album: null }]);
+    const lines = csv.split('\n');
+    const dataRow = lines[1];
+    // code and album are null → should be empty (consecutive commas)
+    expect(dataRow.startsWith(',')).toBe(true); // first field (code) is empty
+  });
 });
