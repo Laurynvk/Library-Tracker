@@ -20,6 +20,16 @@ export async function createTrack(track: NewTrack): Promise<Track> {
   return data as Track;
 }
 
+export async function importTracks(newTracks: NewTrack[]): Promise<Track[]> {
+  if (newTracks.length === 0) return [];
+  const { data, error } = await supabase
+    .from('tracks')
+    .insert(newTracks)
+    .select();
+  if (error) throw error;
+  return data as Track[];
+}
+
 export async function updateTrack(id: string, patch: Partial<NewTrack>): Promise<Track> {
   const { data, error } = await supabase
     .from('tracks')
