@@ -54,6 +54,7 @@ export function ImportModal({ onClose, onImported }: Props) {
       setWarningCount(defaultedCount);
       setStep('preview');
     };
+    reader.onerror = () => setError('Failed to read file. Please try again.');
     reader.readAsText(file);
   }, []);
 

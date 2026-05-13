@@ -54,6 +54,7 @@ export function mapRow(raw: Record<string, string>): ParsedRow | null {
   if (!title) return null;
 
   const fka = row['FKA']?.trim();
+  const existingNotes = row['NOTES']?.trim();
 
   return {
     title,
@@ -65,8 +66,10 @@ export function mapRow(raw: Record<string, string>): ParsedRow | null {
     publisher: row['LABEL']?.trim() || null,
     collaborators: row['WRITERS']
       ? row['WRITERS'].split(',').map((s) => s.trim()).filter(Boolean)
+      : row['COLLABORATORS']
+      ? row['COLLABORATORS'].split(';').map((s) => s.trim()).filter(Boolean)
       : [],
-    notes: fka ? `FKA: ${fka}` : null,
+    notes: fka ? `FKA: ${fka}` : existingNotes || null,
     invoice: 'unpaid',
     fee: null,
     publisher_email: null,
