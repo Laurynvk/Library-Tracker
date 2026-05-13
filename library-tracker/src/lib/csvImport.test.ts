@@ -4,6 +4,7 @@ import {
   mapRow,
   applyFilter,
   getFilterValues,
+  parseCSVText,
 } from './csvImport';
 
 describe('fuzzyMatchStatus', () => {
@@ -64,6 +65,18 @@ describe('mapRow', () => {
     expect(row!.notes).toBeNull();
     expect(row!.collaborators).toEqual([]);
   });
+
+  it('handles invalid date gracefully', () => {
+    const row = mapRow({ TITLE: 'My Track', 'DATE DUE': 'not a date' });
+    expect(row).not.toBeNull();
+    expect(row!.due_date).toBeNull();
+  });
+
+  it('parses a valid date', () => {
+    const row = mapRow({ TITLE: 'My Track', 'DATE DUE': '2026-06-01' });
+    expect(row).not.toBeNull();
+    expect(row!.due_date).toBe('2026-06-01');
+  });
 });
 
 describe('applyFilter', () => {
@@ -112,5 +125,35 @@ describe('getFilterValues', () => {
     expect(vals.label).toEqual(['APM', 'Extreme']);
     expect(vals.status).toEqual(['delivered', 'sent', 'writing']);
     expect(vals.album).toEqual(['Vol1', 'Vol2']);
+  });
+});
+
+describe('parseCSVText', () => {
+  it('parses a CSV string into rows', () => {
+    const csv = `TITLE,STATUS,COMP INT\nSummer Drive,sent,LK\nCity Pulse,writing,JB`;
+    const { rows } = parseCSVText(csv);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].title).toBe('Summer Drive');
+    expect(rows[0].status).toBe('sent');
+  });
+
+  it('skips rows without a title', () => {
+    const csv = `TITLE,STATUS\nSummer Drive,sent\n,writing`;
+    const { rows } = parseCSVText(csv);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('counts unrecognised status values', () => {
+    const csv = `TITLE,STATUS\nTrack A,sent\nTrack B,some weird status\nTrack C,another unknown`;
+    const { rows, defaultedCount } = parseCSVText(csv);
+    expect(rows).toHaveLength(3);
+    expect(defaultedCount).toBe(2);
+    expect(rows[1].status).toBe('brief'); // defaulted
+  });
+
+  it('returns 0 defaultedCount when all statuses are recognised', () => {
+    const csv = `TITLE,STATUS\nTrack A,sent\nTrack B,writing`;
+    const { defaultedCount } = parseCSVText(csv);
+    expect(defaultedCount).toBe(0);
   });
 });

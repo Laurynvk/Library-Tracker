@@ -107,6 +107,7 @@ export function applyFilter(rows: ParsedRow[], filter: ImportFilter): ParsedRow[
       case 'label':    return (r.publisher ?? '').toLowerCase().includes(val);
       case 'status':   return r.status.toLowerCase().includes(val);
       case 'album':    return (r.album ?? '').toLowerCase().includes(val);
+      default: return true;
     }
   });
 }
