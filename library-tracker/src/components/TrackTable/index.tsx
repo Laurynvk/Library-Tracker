@@ -217,8 +217,8 @@ function TitleWithCopy({ title, copyValue, onCommit }: { title: string; copyValu
       onMouseLeave={() => setHovered(false)}
     >
       <EditableTitle value={title} onCommit={onCommit} />
-      {hovered && copyValue && (
-        <CopyIconButton value={copyValue} title="Copy file naming system" size={12} />
+      {hovered && (
+        <CopyIconButton value={copyValue || title} title="Copy file naming system" size={12} />
       )}
     </div>
   );
