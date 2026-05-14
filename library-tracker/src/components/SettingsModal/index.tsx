@@ -94,10 +94,13 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
     focusedKeyRef.current = key;
   }
 
-  function insertToken(token: string) {
-    const input = focusedInputRef.current;
-    const key = focusedKeyRef.current;
-    if (!input || key === null) return;
+  function insertToken(key: string, token: string) {
+    // The chip explicitly tells us which field it belongs to (default,
+    // a publisher name, or the add-publisher form). Never infer from focus,
+    // because chip clicks preventDefault and the focus ref can be stale,
+    // causing cross-contamination between fields.
+    const input =
+      focusedKeyRef.current === key ? focusedInputRef.current : null;
 
     // Only named tokens (e.g. {PROJECT}) toggle on re-click; separators like
     // " ", "_", "-" can legitimately appear multiple times so they always insert.
@@ -114,8 +117,8 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
           cursor: existingIdx,
         };
       }
-      const start = input.selectionStart ?? current.length;
-      const end = input.selectionEnd ?? current.length;
+      const start = input?.selectionStart ?? current.length;
+      const end = input?.selectionEnd ?? current.length;
       return {
         value: current.slice(0, start) + token + current.slice(end),
         cursor: start + token.length,
@@ -143,10 +146,12 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
         return { ...s, publishers: { ...s.publishers, [key]: value } };
       });
     }
-    requestAnimationFrame(() => {
-      input.focus();
-      input.setSelectionRange(nextCursor, nextCursor);
-    });
+    if (input) {
+      requestAnimationFrame(() => {
+        input.focus();
+        input.setSelectionRange(nextCursor, nextCursor);
+      });
+    }
   }
 
   function removePublisher(name: string) {
@@ -189,13 +194,13 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
     }
   }
 
-  function TokenChips() {
+  function TokenChips({ fieldKey }: { fieldKey: string }) {
     return (
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
         {TOKENS.map((t) => (
           <span
             key={t}
-            onMouseDown={(e) => { e.preventDefault(); insertToken(t); }}
+            onMouseDown={(e) => { e.preventDefault(); insertToken(fieldKey, t); }}
             style={{
               background: '#e8f5e9', border: '1px solid #a5d6a7',
               borderRadius: 3, padding: '2px 7px',
@@ -210,7 +215,7 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
           <span
             key={value}
             title={title}
-            onMouseDown={(e) => { e.preventDefault(); insertToken(value); }}
+            onMouseDown={(e) => { e.preventDefault(); insertToken(fieldKey, value); }}
             style={{
               background: '#e8f5e9', border: '1px solid #a5d6a7',
               borderRadius: 3, padding: '2px 7px',
@@ -483,7 +488,7 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                       onClear={() => setEditState((s) => ({ ...s, default: '' }))}
                       onFocus={(e) => trackFocus('default', e)}
                     />
-                    {TokenChips()}
+                    {TokenChips({ fieldKey: 'default' })}
                     {PreviewLine({ template: editState.default })}
                   </div>
 
@@ -525,7 +530,7 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                         }
                         onFocus={(e) => trackFocus(name, e)}
                       />
-                      {TokenChips()}
+                      {TokenChips({ fieldKey: name })}
                       {PreviewLine({ template })}
                     </div>
                   ))}
@@ -571,7 +576,7 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                         onClear={() => setAddForm((f) => f ? { ...f, template: '' } : f)}
                         onFocus={(e) => trackFocus('__add__', e)}
                       />
-                      {TokenChips()}
+                      {TokenChips({ fieldKey: '__add__' })}
                       {PreviewLine({ template: addForm.template })}
                       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                         <button
