@@ -98,10 +98,26 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
     const input = focusedInputRef.current;
     const key = focusedKeyRef.current;
     if (!input || key === null) return;
-    const start = input.selectionStart ?? input.value.length;
-    const end = input.selectionEnd ?? input.value.length;
-    const newValue = input.value.slice(0, start) + token + input.value.slice(end);
-    const newCursor = start + token.length;
+
+    const current = input.value;
+    // Only named tokens (e.g. {PROJECT}) toggle on re-click; separators like
+    // " ", "_", "-" can legitimately appear multiple times so they always insert.
+    const isNamedToken = TOKENS.includes(token);
+    const existingIdx = isNamedToken ? current.indexOf(token) : -1;
+
+    let newValue: string;
+    let newCursor: number;
+    if (existingIdx !== -1) {
+      // Toggle off: remove the first occurrence of this token.
+      newValue = current.slice(0, existingIdx) + current.slice(existingIdx + token.length);
+      newCursor = existingIdx;
+    } else {
+      const start = input.selectionStart ?? current.length;
+      const end = input.selectionEnd ?? current.length;
+      newValue = current.slice(0, start) + token + current.slice(end);
+      newCursor = start + token.length;
+    }
+
     if (key === 'default') {
       setEditState((s) => ({ ...s, default: newValue }));
     } else if (key === '__add__') {
