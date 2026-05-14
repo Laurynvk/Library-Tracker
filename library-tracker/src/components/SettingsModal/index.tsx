@@ -38,9 +38,10 @@ type Props = {
   onClose: () => void;
   onImportClick: () => void;
   onExport: () => void;
+  onDarkModeChange: (dark: boolean) => void;
 };
 
-export function SettingsModal({ onClose, onImportClick, onExport }: Props) {
+export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChange }: Props) {
   const THEME = useTheme();
 
   const fieldStyle: React.CSSProperties = {
@@ -322,20 +323,33 @@ export function SettingsModal({ onClose, onImportClick, onExport }: Props) {
                   </div>
 
                   {/* Dark Mode */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input
-                      id="dark-mode-toggle"
-                      type="checkbox"
-                      checked={editState.darkMode}
-                      onChange={(e) => setEditState((s) => ({ ...s, darkMode: e.target.checked }))}
-                      style={{ width: 16, height: 16, cursor: 'pointer' }}
-                    />
-                    <label
-                      htmlFor="dark-mode-toggle"
-                      style={{ fontSize: 11.5, fontWeight: 600, color: THEME.ink, cursor: 'pointer' }}
-                    >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: 11.5, fontWeight: 600, color: THEME.ink }}>
                       Dark Mode
                     </label>
+                    <div
+                      onClick={() => {
+                        const next = !editState.darkMode;
+                        setEditState((s) => ({ ...s, darkMode: next }));
+                        onDarkModeChange(next);
+                      }}
+                      style={{
+                        width: 40, height: 22, borderRadius: 11,
+                        background: editState.darkMode ? THEME.accent : THEME.border,
+                        position: 'relative', cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute',
+                        top: 3, left: editState.darkMode ? 21 : 3,
+                        width: 16, height: 16, borderRadius: '50%',
+                        background: '#fff',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                        transition: 'left 0.2s',
+                      }} />
+                    </div>
                   </div>
 
                 </div>

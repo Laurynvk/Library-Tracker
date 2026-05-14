@@ -221,6 +221,7 @@ export default function App() {
             onClose={() => setSettingsOpen(false)}
             onImportClick={() => { setSettingsOpen(false); setImportOpen(true); }}
             onExport={handleExport}
+            onDarkModeChange={setDarkMode}
           />
         )}
         {importOpen && (
