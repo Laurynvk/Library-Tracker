@@ -12,6 +12,7 @@ import type { Track, InvoiceStatus } from '../../types/track';
 import { StatusPill } from './StatusPill';
 import { InvoiceBadge } from './InvoiceBadge';
 import { CopyIconButton } from '../CopyIconButton';
+import { resolveFileNamingForCopy, type NamingTemplates } from '../../lib/settings';
 
 type Props = {
   tracks: Track[];
@@ -23,6 +24,7 @@ type Props = {
   selectedTrackId?: string;
   userInitials?: string;
   defaultVersion?: string;
+  namingTemplates?: NamingTemplates;
   onImportClick?: () => void;
   totalTrackCount?: number;
 };
@@ -206,7 +208,7 @@ function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: strin
   );
 }
 
-function TitleWithCopy({ title, fileNaming, onCommit }: { title: string; fileNaming: string | null; onCommit: (v: string) => void }) {
+function TitleWithCopy({ title, copyValue, onCommit }: { title: string; copyValue: string; onCommit: (v: string) => void }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -215,8 +217,8 @@ function TitleWithCopy({ title, fileNaming, onCommit }: { title: string; fileNam
       onMouseLeave={() => setHovered(false)}
     >
       <EditableTitle value={title} onCommit={onCommit} />
-      {hovered && fileNaming && (
-        <CopyIconButton value={fileNaming} title="Copy file naming system" size={12} />
+      {hovered && copyValue && (
+        <CopyIconButton value={copyValue} title="Copy file naming system" size={12} />
       )}
     </div>
   );
@@ -268,7 +270,7 @@ declare module '@tanstack/react-table' {
   }
 }
 
-export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId, userInitials, defaultVersion, onImportClick, totalTrackCount }: Props) {
+export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId, userInitials, defaultVersion, namingTemplates, onImportClick, totalTrackCount }: Props) {
   const THEME = useTheme();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
 
@@ -289,7 +291,11 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
         cell: (i) => (
           <TitleWithCopy
             title={i.getValue()}
-            fileNaming={i.row.original.file_naming}
+            copyValue={resolveFileNamingForCopy(
+              namingTemplates ?? {},
+              i.row.original.publisher,
+              i.row.original.file_naming,
+            )}
             onCommit={(title) => i.table.options.meta?.onUpdateTitle(i.row.original.id, title)}
           />
         ),
@@ -365,7 +371,7 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
         enableSorting: false,
       }),
     ],
-    [THEME, userInitials, defaultVersion],
+    [THEME, userInitials, defaultVersion, namingTemplates],
   );
 
   const table = useReactTable({

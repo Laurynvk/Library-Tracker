@@ -54,6 +54,24 @@ export async function saveSettings(settings: UserSettings): Promise<void> {
   cache = settings;
 }
 
+/**
+ * Resolve the file naming template that should be used for a track when
+ * copying its file naming system. If the track's publisher has a per-publisher
+ * template configured, use it. Otherwise fall back to the default template.
+ * If neither is configured, return the value stored on the track itself
+ * (which may itself be the original brief-derived naming string).
+ */
+export function resolveFileNamingForCopy(
+  templates: NamingTemplates,
+  publisher: string | null,
+  stored: string | null,
+): string {
+  const publisherTpl = publisher ? templates.publishers?.[publisher] : undefined;
+  if (publisherTpl) return publisherTpl;
+  if (templates.default) return templates.default;
+  return stored ?? '';
+}
+
 export async function fetchPublisherNames(): Promise<string[]> {
   const { data, error } = await supabase
     .from('tracks')

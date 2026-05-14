@@ -8,7 +8,7 @@ import { InboxDrawer } from './components/InboxDrawer';
 import { BriefModal } from './components/BriefModal';
 import { SettingsModal } from './components/SettingsModal';
 import { THEME, DARK_THEME, ThemeContext } from './lib/theme';
-import { fetchSettings } from './lib/settings';
+import { fetchSettings, type NamingTemplates } from './lib/settings';
 import type { Track, InvoiceStatus } from './types/track';
 import { ImportModal } from './components/ImportModal';
 import { tracksToCSV, downloadCSV } from './lib/csvExport';
@@ -34,12 +34,14 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [userInitials, setUserInitials] = useState<string | undefined>(undefined);
   const [defaultVersion, setDefaultVersion] = useState<string | undefined>(undefined);
+  const [namingTemplates, setNamingTemplates] = useState<NamingTemplates>({});
   const [importOpen, setImportOpen] = useState(false);
 
   function applySettings(s: Awaited<ReturnType<typeof fetchSettings>>) {
     setDarkMode(s.dark_mode ?? false);
     setUserInitials(s.initials);
     setDefaultVersion(s.default_version);
+    setNamingTemplates(s.naming_templates ?? {});
   }
 
   useEffect(() => {
@@ -193,6 +195,7 @@ export default function App() {
           selectedTrackId={selectedTrack?.id}
           userInitials={userInitials}
           defaultVersion={defaultVersion}
+          namingTemplates={namingTemplates}
           onImportClick={() => setImportOpen(true)}
           totalTrackCount={tracks.length}
         />
@@ -200,6 +203,7 @@ export default function App() {
         <TrackDrawer
           key={selectedTrack?.id ?? 'none'}
           track={selectedTrack}
+          namingTemplates={namingTemplates}
           onClose={() => setSelectedTrack(null)}
           onSave={handleSaveTrack}
         />
