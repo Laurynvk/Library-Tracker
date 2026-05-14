@@ -117,12 +117,11 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
           cursor: existingIdx,
         };
       }
-      const start = input?.selectionStart ?? current.length;
-      const end = input?.selectionEnd ?? current.length;
-      return {
-        value: current.slice(0, start) + token + current.slice(end),
-        cursor: start + token.length,
-      };
+      // Always append new tokens to the end (right side) of the template so
+      // that clicking chips in order produces a left-to-right sequence, even
+      // when the input has never been focused or the caret sits at position 0.
+      const value = current + token;
+      return { value, cursor: value.length };
     };
 
     let nextCursor = 0;
