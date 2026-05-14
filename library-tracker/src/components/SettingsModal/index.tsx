@@ -192,6 +192,55 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
     );
   }
 
+  function ClearableTemplateField({
+    value,
+    placeholder,
+    onChange,
+    onClear,
+    onFocus,
+    style,
+  }: {
+    value: string;
+    placeholder: string;
+    onChange: (v: string) => void;
+    onClear: () => void;
+    onFocus: (e: React.FocusEvent<HTMLInputElement>) => void;
+    style?: React.CSSProperties;
+  }) {
+    const merged = { ...fieldStyle, ...(style ?? {}) };
+    return (
+      <div style={{ position: 'relative' }}>
+        <input
+          style={{ ...merged, paddingRight: value ? 26 : merged.padding ? undefined : 9 }}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={onFocus}
+        />
+        {value && (
+          <button
+            type="button"
+            aria-label="Clear field"
+            title="Clear"
+            onMouseDown={(e) => { e.preventDefault(); onClear(); }}
+            style={{
+              position: 'absolute',
+              right: 4, top: '50%', transform: 'translateY(-50%)',
+              width: 18, height: 18, borderRadius: '50%',
+              border: 'none', background: 'transparent',
+              cursor: 'pointer', color: THEME.inkMuted,
+              fontSize: 14, lineHeight: 1, padding: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: THEME.sans,
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+    );
+  }
+
   function PreviewLine({ template }: { template: string }) {
     if (!template) return null;
     return (
@@ -392,11 +441,12 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                     }}>
                       Your Default
                     </div>
-                    <input
-                      style={{ ...fieldStyle, borderColor: '#b8d4b0', background: '#fff' }}
+                    <ClearableTemplateField
+                      style={{ borderColor: '#b8d4b0', background: '#fff' }}
                       value={editState.default}
                       placeholder="e.g. {PROJECT} {ALBUM} {TITLE} {VERSION}"
-                      onChange={(e) => setEditState((s) => ({ ...s, default: e.target.value }))}
+                      onChange={(v) => setEditState((s) => ({ ...s, default: v }))}
+                      onClear={() => setEditState((s) => ({ ...s, default: '' }))}
                       onFocus={(e) => trackFocus('default', e)}
                     />
                     {TokenChips()}
@@ -424,14 +474,19 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                           Remove
                         </button>
                       </div>
-                      <input
-                        style={fieldStyle}
+                      <ClearableTemplateField
                         value={template}
                         placeholder="e.g. {PROJECT} {TITLE} {VERSION}"
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setEditState((s) => ({
                             ...s,
-                            publishers: { ...s.publishers, [name]: e.target.value },
+                            publishers: { ...s.publishers, [name]: v },
+                          }))
+                        }
+                        onClear={() =>
+                          setEditState((s) => ({
+                            ...s,
+                            publishers: { ...s.publishers, [name]: '' },
                           }))
                         }
                         onFocus={(e) => trackFocus(name, e)}
@@ -475,11 +530,11 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                         placeholder="Publisher name…"
                         onChange={(e) => setAddForm((f) => f ? { ...f, name: e.target.value } : f)}
                       />
-                      <input
-                        style={fieldStyle}
+                      <ClearableTemplateField
                         value={addForm.template}
                         placeholder="e.g. {PROJECT} {TITLE} {VERSION}"
-                        onChange={(e) => setAddForm((f) => f ? { ...f, template: e.target.value } : f)}
+                        onChange={(v) => setAddForm((f) => f ? { ...f, template: v } : f)}
+                        onClear={() => setAddForm((f) => f ? { ...f, template: '' } : f)}
                         onFocus={(e) => trackFocus('__add__', e)}
                       />
                       {TokenChips()}
