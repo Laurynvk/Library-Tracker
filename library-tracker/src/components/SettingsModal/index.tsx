@@ -172,15 +172,17 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
             {t}
           </span>
         ))}
-        {[{ label: '_', value: '_' }, { label: '-', value: '-' }, { label: '·', value: ' ' }].map(({ label, value }) => (
+        {[{ label: '_', value: '_' }, { label: '-', value: '-' }, { label: ' ', value: ' ', title: 'space' }].map(({ label, value, title }) => (
           <span
-            key={label}
+            key={value}
+            title={title}
             onMouseDown={(e) => { e.preventDefault(); insertToken(value); }}
             style={{
               background: '#e8f5e9', border: '1px solid #a5d6a7',
               borderRadius: 3, padding: '2px 7px',
               fontSize: 10, fontFamily: THEME.mono, color: '#2a6e22',
               cursor: 'pointer', userSelect: 'none',
+              whiteSpace: 'pre',
             }}
           >
             {label}
