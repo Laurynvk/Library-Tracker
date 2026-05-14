@@ -99,35 +99,53 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
     const key = focusedKeyRef.current;
     if (!input || key === null) return;
 
-    const current = input.value;
     // Only named tokens (e.g. {PROJECT}) toggle on re-click; separators like
     // " ", "_", "-" can legitimately appear multiple times so they always insert.
     const isNamedToken = TOKENS.includes(token);
-    const existingIdx = isNamedToken ? current.indexOf(token) : -1;
 
-    let newValue: string;
-    let newCursor: number;
-    if (existingIdx !== -1) {
-      // Toggle off: remove the first occurrence of this token.
-      newValue = current.slice(0, existingIdx) + current.slice(existingIdx + token.length);
-      newCursor = existingIdx;
-    } else {
+    // Compute next value from the current source of truth (React state), so we
+    // only touch this exact token and never accidentally match neighbours.
+    const computeNext = (current: string): { value: string; cursor: number } => {
+      const existingIdx = isNamedToken ? current.indexOf(token) : -1;
+      if (existingIdx !== -1) {
+        // Toggle off: remove only this exact token's first occurrence.
+        return {
+          value: current.slice(0, existingIdx) + current.slice(existingIdx + token.length),
+          cursor: existingIdx,
+        };
+      }
       const start = input.selectionStart ?? current.length;
       const end = input.selectionEnd ?? current.length;
-      newValue = current.slice(0, start) + token + current.slice(end);
-      newCursor = start + token.length;
-    }
+      return {
+        value: current.slice(0, start) + token + current.slice(end),
+        cursor: start + token.length,
+      };
+    };
 
+    let nextCursor = 0;
     if (key === 'default') {
-      setEditState((s) => ({ ...s, default: newValue }));
+      setEditState((s) => {
+        const { value, cursor } = computeNext(s.default);
+        nextCursor = cursor;
+        return { ...s, default: value };
+      });
     } else if (key === '__add__') {
-      setAddForm((f) => (f ? { ...f, template: newValue } : f));
+      setAddForm((f) => {
+        if (!f) return f;
+        const { value, cursor } = computeNext(f.template);
+        nextCursor = cursor;
+        return { ...f, template: value };
+      });
     } else {
-      setEditState((s) => ({ ...s, publishers: { ...s.publishers, [key]: newValue } }));
+      setEditState((s) => {
+        const { value, cursor } = computeNext(s.publishers[key] ?? '');
+        nextCursor = cursor;
+        return { ...s, publishers: { ...s.publishers, [key]: value } };
+      });
     }
     requestAnimationFrame(() => {
       input.focus();
-      input.setSelectionRange(newCursor, newCursor);
+      input.setSelectionRange(nextCursor, nextCursor);
     });
   }
 
