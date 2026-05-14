@@ -12,7 +12,7 @@ import type { Track, InvoiceStatus } from '../../types/track';
 import { StatusPill } from './StatusPill';
 import { InvoiceBadge } from './InvoiceBadge';
 import { CopyIconButton } from '../CopyIconButton';
-import { resolveFileNamingForCopy, type NamingTemplates } from '../../lib/settings';
+import { resolveFileNamingForCopy, renderTemplate, type NamingTemplates } from '../../lib/settings';
 
 type Props = {
   tracks: Track[];
@@ -291,10 +291,19 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
         cell: (i) => (
           <TitleWithCopy
             title={i.getValue()}
-            copyValue={resolveFileNamingForCopy(
-              namingTemplates ?? {},
-              i.row.original.publisher,
-              i.row.original.file_naming,
+            copyValue={renderTemplate(
+              resolveFileNamingForCopy(
+                namingTemplates ?? {},
+                i.row.original.publisher,
+                i.row.original.file_naming,
+              ),
+              {
+                code: i.row.original.code,
+                album: i.row.original.album,
+                title: i.row.original.title,
+                version: normalizeVersion(i.row.original.version, defaultVersion),
+              },
+              userInitials,
             )}
             onCommit={(title) => i.table.options.meta?.onUpdateTitle(i.row.original.id, title)}
           />

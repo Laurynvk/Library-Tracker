@@ -204,6 +204,8 @@ export default function App() {
           key={selectedTrack?.id ?? 'none'}
           track={selectedTrack}
           namingTemplates={namingTemplates}
+          userInitials={userInitials}
+          defaultVersion={defaultVersion}
           onClose={() => setSelectedTrack(null)}
           onSave={handleSaveTrack}
         />

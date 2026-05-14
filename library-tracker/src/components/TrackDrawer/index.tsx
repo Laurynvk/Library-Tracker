@@ -6,11 +6,13 @@ import type { Track } from '../../types/track';
 import { ActivityFeed } from './ActivityFeed';
 import { DrawerField } from './DrawerField';
 import { CopyIconButton } from '../CopyIconButton';
-import { resolveFileNamingForCopy, type NamingTemplates } from '../../lib/settings';
+import { resolveFileNamingForCopy, renderTemplate, type NamingTemplates } from '../../lib/settings';
 
 type Props = {
   track: Track | null;
   namingTemplates?: NamingTemplates;
+  userInitials?: string;
+  defaultVersion?: string;
   onClose: () => void;
   onSave: (updated: Track) => void;
 };
@@ -113,7 +115,7 @@ function ComposerSplits({ value, onChange }: { value: string[]; onChange: (v: st
   );
 }
 
-export function TrackDrawer({ track, namingTemplates, onClose, onSave }: Props) {
+export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersion, onClose, onSave }: Props) {
   const THEME = useTheme();
   const [draft, setDraft] = useState<Track | null>(track);
   const [saving, setSaving] = useState(false);
@@ -376,10 +378,22 @@ export function TrackDrawer({ track, namingTemplates, onClose, onSave }: Props) 
                 {draft.file_naming ?? 'Not set'}
               </div>
               {(() => {
-                const copyValue = resolveFileNamingForCopy(
+                const template = resolveFileNamingForCopy(
                   namingTemplates ?? {},
                   draft.publisher,
                   draft.file_naming,
+                );
+                const rawVersion = draft.version || defaultVersion || 'v1.00';
+                const version = rawVersion.startsWith('v') ? rawVersion : `v${rawVersion}`;
+                const copyValue = renderTemplate(
+                  template,
+                  {
+                    code: draft.code,
+                    album: draft.album,
+                    title: draft.title,
+                    version,
+                  },
+                  userInitials,
                 );
                 return copyValue ? (
                   <CopyIconButton value={copyValue} title="Copy file naming system" size={13} />

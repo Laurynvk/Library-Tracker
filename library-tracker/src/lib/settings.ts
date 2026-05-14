@@ -72,6 +72,39 @@ export function resolveFileNamingForCopy(
   return stored ?? '';
 }
 
+/**
+ * Render a file-naming template by substituting tokens with values from a
+ * track. Token names must match the ones emitted by the Settings UI
+ * (`{PROJECT}`, `{ALBUM}`, `{TITLE}`, `{VERSION}`, `{INITIALS}`). Missing
+ * field values are replaced with the empty string; spacing in the template
+ * is preserved as-is so users have full control over separators.
+ */
+export type TemplateTrackData = {
+  code: string | null;
+  album: string | null;
+  title: string;
+  version: string;
+};
+
+export function renderTemplate(
+  template: string,
+  track: TemplateTrackData,
+  userInitials?: string,
+): string {
+  if (!template) return '';
+  const values: Record<string, string> = {
+    '{PROJECT}': track.code ?? '',
+    '{ALBUM}': track.album ?? '',
+    '{TITLE}': track.title ?? '',
+    '{VERSION}': track.version ?? '',
+    '{INITIALS}': userInitials ?? '',
+  };
+  return Object.entries(values).reduce(
+    (s, [token, val]) => s.replaceAll(token, val),
+    template,
+  );
+}
+
 export async function fetchPublisherNames(): Promise<string[]> {
   const { data, error } = await supabase
     .from('tracks')
