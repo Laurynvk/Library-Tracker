@@ -18,11 +18,21 @@ Deno.serve(async (req) => {
 
     if (req.method !== 'POST') return new Response('ok', { status: 200 });
 
-    const formData = await req.formData();
-    const to = formData.get('to') as string;
-    const from = formData.get('from') as string;
-    const subject = (formData.get('subject') as string) ?? '(no subject)';
-    const text = (formData.get('text') as string) ?? '';
+    const contentType = req.headers.get('content-type') ?? '';
+    let to: string, from: string, subject: string, text: string;
+    if (contentType.includes('application/json')) {
+      const body = await req.json();
+      to = body.to;
+      from = body.from;
+      subject = body.subject ?? '(no subject)';
+      text = body.text ?? '';
+    } else {
+      const formData = await req.formData();
+      to = formData.get('to') as string;
+      from = formData.get('from') as string;
+      subject = (formData.get('subject') as string) ?? '(no subject)';
+      text = (formData.get('text') as string) ?? '';
+    }
 
     console.log('to:', to, 'from:', from, 'subject:', subject);
 
