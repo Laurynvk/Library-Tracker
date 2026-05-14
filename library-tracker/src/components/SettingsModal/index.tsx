@@ -161,7 +161,7 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
         {TOKENS.map((t) => (
           <span
             key={t}
-            onMouseDown={(e) => { e.preventDefault(); insertToken(t); }}
+            onMouseDown={(e) => { e.preventDefault(); insertToken(t + ' '); }}
             style={{
               background: '#e8f5e9', border: '1px solid #a5d6a7',
               borderRadius: 3, padding: '2px 7px',
@@ -170,6 +170,20 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
             }}
           >
             {t}
+          </span>
+        ))}
+        {[{ label: '_', value: '_' }, { label: '-', value: '-' }, { label: '·', value: ' ' }].map(({ label, value }) => (
+          <span
+            key={label}
+            onMouseDown={(e) => { e.preventDefault(); insertToken(value); }}
+            style={{
+              background: '#e8f5e9', border: '1px solid #a5d6a7',
+              borderRadius: 3, padding: '2px 7px',
+              fontSize: 10, fontFamily: THEME.mono, color: '#2a6e22',
+              cursor: 'pointer', userSelect: 'none',
+            }}
+          >
+            {label}
           </span>
         ))}
       </div>
@@ -379,7 +393,7 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                     <input
                       style={{ ...fieldStyle, borderColor: '#b8d4b0', background: '#fff' }}
                       value={editState.default}
-                      placeholder="e.g. {PROJECT}_{ALBUM}_{TITLE}_{VERSION}"
+                      placeholder="e.g. {PROJECT} {ALBUM} {TITLE} {VERSION}"
                       onChange={(e) => setEditState((s) => ({ ...s, default: e.target.value }))}
                       onFocus={(e) => trackFocus('default', e)}
                     />
@@ -411,7 +425,7 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                       <input
                         style={fieldStyle}
                         value={template}
-                        placeholder="e.g. {PROJECT}_{TITLE}_{VERSION}"
+                        placeholder="e.g. {PROJECT} {TITLE} {VERSION}"
                         onChange={(e) =>
                           setEditState((s) => ({
                             ...s,
@@ -462,7 +476,7 @@ export function SettingsModal({ onClose, onImportClick, onExport, onDarkModeChan
                       <input
                         style={fieldStyle}
                         value={addForm.template}
-                        placeholder="e.g. {PROJECT}_{TITLE}_{VERSION}"
+                        placeholder="e.g. {PROJECT} {TITLE} {VERSION}"
                         onChange={(e) => setAddForm((f) => f ? { ...f, template: e.target.value } : f)}
                         onFocus={(e) => trackFocus('__add__', e)}
                       />

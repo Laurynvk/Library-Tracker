@@ -75,7 +75,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
   }
 
   async function applyParsed(result: ParsedBrief) {
-    let fileNaming = result.file_naming ?? '';
+    let fileNaming = (result.file_naming ?? '').replace(/-/g, '');
     let fromSettings = false;
     let defaultVersion = 'v1.00';
 
