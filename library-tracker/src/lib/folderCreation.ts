@@ -100,9 +100,33 @@ export function isFileSystemAccessSupported(): boolean {
  * Prompts user to pick a parent directory, then creates albumName/ inside it.
  * Returns the album folder name on success, null if user cancelled the picker.
  */
+// Indirection layer so tests can swap out persistence and permission helpers
+// without going through fake-indexeddb's structuredClone (which drops the
+// permission methods that a real FileSystemDirectoryHandle would retain).
+export const _folderCreationInternals = {
+  loadDirectoryHandle,
+  verifyPermission,
+  saveDirectoryHandle,
+};
+
 export async function createFoldersOnDesktop(spec: FolderSpec): Promise<string | null> {
   try {
-    const dirHandle = await (window as unknown as { showDirectoryPicker: (opts: object) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker({ mode: 'readwrite' });
+    let dirHandle: FileSystemDirectoryHandle | null = null;
+
+    // Try the previously saved handle first; if usable, skip the picker entirely.
+    const saved = await _folderCreationInternals.loadDirectoryHandle().catch(() => null);
+    if (saved) {
+      const ok = await _folderCreationInternals.verifyPermission(saved).catch(() => false);
+      if (ok) {
+        dirHandle = saved;
+      }
+    }
+
+    if (!dirHandle) {
+      dirHandle = await (window as unknown as { showDirectoryPicker: (opts: object) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker({ mode: 'readwrite' });
+      // Persist for next time. Don't fail folder creation if save fails.
+      await _folderCreationInternals.saveDirectoryHandle(dirHandle).catch(() => undefined);
+    }
 
     const albumDir = await dirHandle.getDirectoryHandle(spec.albumName, { create: true });
 
