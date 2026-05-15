@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { fetchTracks, updateTrack } from './lib/tracks';
+import { fetchTracks, updateTrack, sortByMostRecentlyAdded } from './lib/tracks';
 import { Toolbar } from './components/Toolbar';
 import { TrackTable } from './components/TrackTable';
 import { Footer } from './components/Footer';
@@ -60,7 +60,9 @@ export default function App() {
   const theme = darkMode ? DARK_THEME : THEME;
 
   const filtered = useMemo(() => {
-    let list = [...tracks];
+    // Default natural order: most recently added first.
+    // Fallback to existing array order for legacy tracks without created_at.
+    let list = sortByMostRecentlyAdded(tracks);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((t) =>
@@ -144,7 +146,7 @@ export default function App() {
   }
 
   function handleImported(newTracks: Track[]) {
-    setTracks((prev) => [...prev, ...newTracks]);
+    setTracks((prev) => [...newTracks, ...prev]);
     // Don't close the modal here — ImportModal transitions to its done step
     // and the user closes it via "Go to my tracks →" (which calls onClose)
   }

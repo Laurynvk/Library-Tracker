@@ -272,7 +272,7 @@ declare module '@tanstack/react-table' {
 
 export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId, userInitials, defaultVersion, namingTemplates, onImportClick, totalTrackCount }: Props) {
   const THEME = useTheme();
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'due_date', desc: false }]);
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   // Column order: Code > Title > Version > Album > Publisher > Status > Due > Fee > Invoice > Splits
   const columns = useMemo(
