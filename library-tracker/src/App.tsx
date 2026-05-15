@@ -162,6 +162,11 @@ export default function App() {
     }
   }
 
+  function handleDeleteTrack(id: string) {
+    setTracks((prev) => prev.filter((t) => t.id !== id));
+    setSelectedTrack((prev) => (prev?.id === id ? null : prev));
+  }
+
   function handleBriefCreated(track: Track) {
     setTracks((prev) => [track, ...prev]);
   }
@@ -234,6 +239,7 @@ export default function App() {
           defaultVersion={defaultVersion}
           onClose={() => setSelectedTrack(null)}
           onSave={handleSaveTrack}
+          onDelete={handleDeleteTrack}
         />
         {inboxOpen && (
           <InboxDrawer

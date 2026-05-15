@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTheme, STATUSES, INVOICE_STATES } from '../../lib/theme';
-import { updateTrack } from '../../lib/tracks';
+import { updateTrack, deleteTrack } from '../../lib/tracks';
 import type { Track } from '../../types/track';
 import { ActivityFeed } from './ActivityFeed';
 import { DrawerField } from './DrawerField';
@@ -15,6 +15,7 @@ type Props = {
   defaultVersion?: string;
   onClose: () => void;
   onSave: (updated: Track) => void;
+  onDelete?: (id: string) => void;
 };
 
 function parseComposers(collaborators: string[]) {
@@ -115,11 +116,13 @@ function ComposerSplits({ value, onChange }: { value: string[]; onChange: (v: st
   );
 }
 
-export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersion, onClose, onSave }: Props) {
+export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersion, onClose, onSave, onDelete }: Props) {
   const THEME = useTheme();
   const [draft, setDraft] = useState<Track | null>(track);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const INPUT_STYLE: CSSProperties = {
     width: '100%',
@@ -169,6 +172,21 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
   function handleCancel() {
     setDraft(track);
     setError(null);
+  }
+
+  async function handleConfirmDelete() {
+    if (!track) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteTrack(track.id);
+      onDelete?.(track.id);
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
   }
 
   return (
@@ -480,47 +498,112 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
           flexDirection: 'column',
           gap: 6,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
-            {isDirty && (
-              <span style={{ fontSize: 11, color: THEME.inkMuted, marginRight: 'auto', fontFamily: THEME.sans }}>
-                Unsaved changes
+          {confirmingDelete ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                fontSize: 12.5,
+                color: THEME.ink,
+                marginRight: 'auto',
+                fontFamily: THEME.sans,
+              }}>
+                Are you sure you want to delete this track log?
               </span>
-            )}
-            <button
-              onClick={handleCancel}
-              disabled={!isDirty}
-              style={{
-                padding: '6px 14px',
-                background: 'transparent',
-                border: `1px solid ${THEME.border}`,
-                borderRadius: 5,
-                fontSize: 12.5,
-                fontWeight: 500,
-                color: isDirty ? THEME.inkSoft : THEME.inkMuted,
-                cursor: isDirty ? 'pointer' : 'default',
-                fontFamily: THEME.sans,
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!isDirty || saving}
-              style={{
-                padding: '6px 16px',
-                background: isDirty && !saving ? THEME.accent : THEME.surfaceAlt,
-                border: 'none',
-                borderRadius: 5,
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: isDirty && !saving ? '#fff' : THEME.inkMuted,
-                cursor: isDirty && !saving ? 'pointer' : 'default',
-                fontFamily: THEME.sans,
-              }}
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+                style={{
+                  padding: '6px 14px',
+                  background: 'transparent',
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 5,
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  color: THEME.inkSoft,
+                  cursor: deleting ? 'default' : 'pointer',
+                  fontFamily: THEME.sans,
+                }}
+              >
+                No
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                style={{
+                  padding: '6px 16px',
+                  background: '#c44545',
+                  border: 'none',
+                  borderRadius: 5,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: '#fff',
+                  cursor: deleting ? 'default' : 'pointer',
+                  fontFamily: THEME.sans,
+                  opacity: deleting ? 0.7 : 1,
+                }}
+              >
+                {deleting ? 'Deleting…' : 'Yes'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                style={{
+                  padding: '6px 14px',
+                  background: 'transparent',
+                  border: `1px solid #c44545`,
+                  borderRadius: 5,
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  color: '#c44545',
+                  cursor: 'pointer',
+                  fontFamily: THEME.sans,
+                  marginRight: 'auto',
+                }}
+              >
+                Delete
+              </button>
+              {isDirty && (
+                <span style={{ fontSize: 11, color: THEME.inkMuted, fontFamily: THEME.sans }}>
+                  Unsaved changes
+                </span>
+              )}
+              <button
+                onClick={handleCancel}
+                disabled={!isDirty}
+                style={{
+                  padding: '6px 14px',
+                  background: 'transparent',
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 5,
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  color: isDirty ? THEME.inkSoft : THEME.inkMuted,
+                  cursor: isDirty ? 'pointer' : 'default',
+                  fontFamily: THEME.sans,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!isDirty || saving}
+                style={{
+                  padding: '6px 16px',
+                  background: isDirty && !saving ? THEME.accent : THEME.surfaceAlt,
+                  border: 'none',
+                  borderRadius: 5,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: isDirty && !saving ? '#fff' : THEME.inkMuted,
+                  cursor: isDirty && !saving ? 'pointer' : 'default',
+                  fontFamily: THEME.sans,
+                }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          )}
           {error && (
             <div style={{ fontSize: 11.5, color: '#c44545', fontFamily: THEME.sans }}>
               {error}
