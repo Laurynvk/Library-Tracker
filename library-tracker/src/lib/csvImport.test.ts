@@ -156,4 +156,29 @@ describe('parseCSVText', () => {
     const { defaultedCount } = parseCSVText(csv);
     expect(defaultedCount).toBe(0);
   });
+
+  it('strips a leading UTF-8 BOM so the first header still matches', () => {
+    const BOM = String.fromCharCode(0xfeff);
+    const csv = `${BOM}TITLE,STATUS\nSummer Drive,sent`;
+    const { rows } = parseCSVText(csv);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].title).toBe('Summer Drive');
+    expect(rows[0].status).toBe('sent');
+  });
+
+  it('accepts the app\'s own export headers (Publisher, Due Date, Version, Code, Album)', () => {
+    const csv = [
+      'Code,Title,Version,Album,Publisher,Status,Invoice,Fee,Due Date,Notes,Collaborators,Created At',
+      'APM-001,Summer Drive,v1.02,Volume A,APM Music,sent,unpaid,,2026-06-01,some notes,LK;JB,2026-05-01',
+    ].join('\n');
+    const { rows } = parseCSVText(csv);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].title).toBe('Summer Drive');
+    expect(rows[0].publisher).toBe('APM Music');
+    expect(rows[0].due_date).toBe('2026-06-01');
+    expect(rows[0].version).toBe('v1.02');
+    expect(rows[0].code).toBe('APM-001');
+    expect(rows[0].album).toBe('Volume A');
+    expect(rows[0].collaborators).toEqual(['LK', 'JB']);
+  });
 });

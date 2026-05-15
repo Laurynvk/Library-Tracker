@@ -40,9 +40,23 @@ function parseDate(raw: string | undefined): string | null {
   return d.toISOString().split('T')[0];
 }
 
-// Normalise a CSV header: trim + uppercase
+// Normalise a CSV header: strip BOM + trim + uppercase.
+// Excel / Google Sheets exports often start with a UTF-8 BOM (U+FEFF)
+// which would otherwise leave the first header un-matchable.
 function h(raw: string): string {
-  return raw.trim().toUpperCase();
+  const stripped = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
+  return stripped.trim().toUpperCase();
+}
+
+// Look up a value from the row by trying multiple header aliases.
+// Useful so that the app's own CSV export (which uses "Publisher",
+// "Due Date", etc.) can be round-tripped through import.
+function pick(row: Record<string, string>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = row[k];
+    if (v != null && v.trim() !== '') return v;
+  }
+  return '';
 }
 
 export function mapRow(raw: Record<string, string>): ParsedRow | null {
@@ -50,24 +64,24 @@ export function mapRow(raw: Record<string, string>): ParsedRow | null {
   const row: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) row[h(k)] = v ?? '';
 
-  const title = row['TITLE']?.trim();
+  const title = pick(row, 'TITLE', 'TRACK', 'TRACK TITLE', 'NAME').trim();
   if (!title) return null;
 
   const fka = row['FKA']?.trim();
-  const existingNotes = row['NOTES']?.trim();
+  const existingNotes = pick(row, 'NOTES', 'NOTE').trim();
+  const collabRaw = pick(row, 'WRITERS', 'COLLABORATORS', 'COLLABS');
+  const collabSeparator = collabRaw.includes(';') ? ';' : ',';
 
   return {
     title,
-    version: row['VERS']?.trim() || 'v1.00',
-    code: row['PROJECT CODE']?.trim() || null,
-    status: fuzzyMatchStatus(row['STATUS'] ?? ''),
-    due_date: parseDate(row['DATE DUE']),
-    album: row['ALBUM / ORDER']?.trim() || null,
-    publisher: row['LABEL']?.trim() || null,
-    collaborators: row['WRITERS']
-      ? row['WRITERS'].split(',').map((s) => s.trim()).filter(Boolean)
-      : row['COLLABORATORS']
-      ? row['COLLABORATORS'].split(';').map((s) => s.trim()).filter(Boolean)
+    version: pick(row, 'VERS', 'VERSION').trim() || 'v1.00',
+    code: pick(row, 'PROJECT CODE', 'CODE').trim() || null,
+    status: fuzzyMatchStatus(pick(row, 'STATUS')),
+    due_date: parseDate(pick(row, 'DATE DUE', 'DUE DATE', 'DUE')),
+    album: pick(row, 'ALBUM / ORDER', 'ALBUM', 'ORDER').trim() || null,
+    publisher: pick(row, 'LABEL', 'PUBLISHER').trim() || null,
+    collaborators: collabRaw
+      ? collabRaw.split(collabSeparator).map((s) => s.trim()).filter(Boolean)
       : [],
     notes: fka ? `FKA: ${fka}` : existingNotes || null,
     invoice: 'unpaid',
@@ -82,7 +96,11 @@ export function mapRow(raw: Record<string, string>): ParsedRow | null {
 }
 
 export function parseCSVText(text: string): { rows: ParsedRow[]; defaultedCount: number } {
-  const result = Papa.parse<Record<string, string>>(text, {
+  // Strip a leading UTF-8 BOM (U+FEFF). Excel / Google Sheets exports
+  // commonly include one, and it would otherwise corrupt the first header
+  // (e.g. "<BOM>TITLE") so that no row maps to a title and the preview is empty.
+  const cleaned = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const result = Papa.parse<Record<string, string>>(cleaned, {
     header: true,
     skipEmptyLines: true,
   });
