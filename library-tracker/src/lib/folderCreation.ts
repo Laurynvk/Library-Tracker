@@ -1,5 +1,90 @@
 import JSZip from 'jszip';
 
+const IDB_NAME = 'library-tracker';
+const IDB_STORE = 'handles';
+const ROOT_DIR_KEY = 'rootDir';
+
+function openHandleDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
+ * Persists a FileSystemDirectoryHandle in IndexedDB under the key "rootDir".
+ * Browsers that support the File System Access API allow structured-cloning
+ * the handle directly into IDB.
+ */
+export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+  const db = await openHandleDB();
+  try {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    await idbRequest(tx.objectStore(IDB_STORE).put(handle, ROOT_DIR_KEY));
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Loads the previously saved root directory handle, or returns null if none exists.
+ */
+export async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
+  const db = await openHandleDB();
+  try {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const result = await idbRequest(tx.objectStore(IDB_STORE).get(ROOT_DIR_KEY));
+    return (result as FileSystemDirectoryHandle | undefined) ?? null;
+  } finally {
+    db.close();
+  }
+}
+
+type PermissionDescriptor = { mode: 'read' | 'readwrite' };
+type PermissionState = 'granted' | 'denied' | 'prompt';
+interface HandleWithPermissions {
+  queryPermission?: (desc: PermissionDescriptor) => Promise<PermissionState>;
+  requestPermission?: (desc: PermissionDescriptor) => Promise<PermissionState>;
+}
+
+/**
+ * Ensures we have readwrite permission on the given directory handle.
+ * Queries current permission; if not granted, prompts the user.
+ * Returns true if permission is (or becomes) granted, false otherwise.
+ */
+export async function verifyPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  const h = handle as unknown as HandleWithPermissions;
+  const opts: PermissionDescriptor = { mode: 'readwrite' };
+  if (typeof h.queryPermission === 'function') {
+    const current = await h.queryPermission(opts);
+    if (current === 'granted') return true;
+  }
+  if (typeof h.requestPermission === 'function') {
+    const requested = await h.requestPermission(opts);
+    return requested === 'granted';
+  }
+  return false;
+}
+
 export interface FolderSpec {
   albumName: string;
   topLevelFolders: string[];   // e.g. ['_DEMO2MX', 'Tracks', 'Print']
