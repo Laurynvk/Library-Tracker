@@ -35,6 +35,7 @@ export function ImportModal({ onClose, onImported }: Props) {
   const [importing, setImporting] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
   const [warningCount, setWarningCount] = useState(0);
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const filter: ImportFilter = filterValue.trim()
@@ -49,9 +50,10 @@ export function ImportModal({ onClose, onImported }: Props) {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const { rows, defaultedCount } = parseCSVText(text);
+      const { rows, defaultedCount, detectedHeaders } = parseCSVText(text);
       setAllRows(rows);
       setWarningCount(defaultedCount);
+      setDetectedHeaders(detectedHeaders);
       setStep('preview');
     };
     reader.onerror = () => setError('Failed to read file. Please try again.');
@@ -202,6 +204,28 @@ export function ImportModal({ onClose, onImported }: Props) {
                   fontSize: 12, color: '#c44545', marginBottom: 12,
                 }}>
                   {error}
+                </div>
+              )}
+
+              {allRows.length === 0 && detectedHeaders.length > 0 && (
+                <div style={{
+                  background: '#fef3c7', border: '1px solid #fbbf24',
+                  borderRadius: 6, padding: '8px 12px',
+                  fontSize: 12, color: '#78350f', marginBottom: 12,
+                }}>
+                  <strong>No title column found.</strong> Your CSV has these headers:{' '}
+                  <code style={{ fontSize: 11 }}>{detectedHeaders.join(', ')}</code>
+                  <br />
+                  Expected one of: <code style={{ fontSize: 11 }}>Title, Track, Track Title, Name</code>
+                </div>
+              )}
+              {allRows.length === 0 && detectedHeaders.length === 0 && (
+                <div style={{
+                  background: '#fef3c7', border: '1px solid #fbbf24',
+                  borderRadius: 6, padding: '8px 12px',
+                  fontSize: 12, color: '#78350f', marginBottom: 12,
+                }}>
+                  The file appears to be empty or could not be parsed.
                 </div>
               )}
 

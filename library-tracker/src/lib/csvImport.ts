@@ -95,28 +95,47 @@ export function mapRow(raw: Record<string, string>): ParsedRow | null {
   };
 }
 
-export function parseCSVText(text: string): { rows: ParsedRow[]; defaultedCount: number } {
-  // Strip a leading UTF-8 BOM (U+FEFF). Excel / Google Sheets exports
-  // commonly include one, and it would otherwise corrupt the first header
-  // (e.g. "<BOM>TITLE") so that no row maps to a title and the preview is empty.
+const TITLE_ALIASES = new Set(['TITLE', 'TRACK', 'TRACK TITLE', 'NAME']);
+
+export function parseCSVText(text: string): { rows: ParsedRow[]; defaultedCount: number; detectedHeaders: string[] } {
+  // Strip a leading UTF-8 BOM (U+FEFF).
   const cleaned = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-  const result = Papa.parse<Record<string, string>>(cleaned, {
-    header: true,
-    skipEmptyLines: true,
+
+  // Parse without headers first so we can locate the real header row ourselves.
+  // Google Sheets sometimes exports hidden rows (or skips them), meaning the
+  // row containing "TITLE" may not be the first row in the file.
+  const raw = Papa.parse<string[]>(cleaned, { header: false, skipEmptyLines: true });
+  const allRows = raw.data;
+  if (allRows.length === 0) return { rows: [], defaultedCount: 0, detectedHeaders: [] };
+
+  // Find the first row that contains a recognised title-column alias.
+  const headerIdx = allRows.findIndex((row) =>
+    row.some((cell) => TITLE_ALIASES.has((cell ?? '').trim().toUpperCase()))
+  );
+  const effectiveHeaderIdx = headerIdx >= 0 ? headerIdx : 0;
+  const headers = allRows[effectiveHeaderIdx].map((c) => (c ?? '').trim());
+  const detectedHeaders = headers;
+
+  // Convert subsequent rows into keyed records using those headers.
+  const records: Record<string, string>[] = allRows.slice(effectiveHeaderIdx + 1).map((row) => {
+    const rec: Record<string, string> = {};
+    headers.forEach((hdr, i) => { rec[hdr] = row[i] ?? ''; });
+    return rec;
   });
+
   let defaultedCount = 0;
-  const rows = result.data
-    .map((raw) => {
-      const row = mapRow(raw);
+  const rows = records
+    .map((rec) => {
+      const row = mapRow(rec);
       if (!row) return null;
-      // Count rows where STATUS was non-empty but unrecognised
-      const originalStatus = Object.entries(raw).find(([k]) => k.trim().toUpperCase() === 'STATUS')?.[1]?.trim() ?? '';
+      const originalStatus = Object.entries(rec).find(([k]) => k.trim().toUpperCase() === 'STATUS')?.[1]?.trim() ?? '';
       const key = originalStatus.toLowerCase();
       if (originalStatus && !(key in STATUS_MAP)) defaultedCount++;
       return row;
     })
     .filter((r): r is ParsedRow => r !== null);
-  return { rows, defaultedCount };
+
+  return { rows, defaultedCount, detectedHeaders };
 }
 
 export function applyFilter(rows: ParsedRow[], filter: ImportFilter): ParsedRow[] {
