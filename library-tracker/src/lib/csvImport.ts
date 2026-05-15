@@ -15,22 +15,40 @@ export type ParsedRow = Omit<NewTrack, 'invoice'> & {
 };
 
 const STATUS_MAP: Record<string, StatusId> = {
-  brief: 'brief', new: 'brief', received: 'brief', commissioned: 'brief',
+  brief: 'brief', new: 'brief', received: 'brief', commissioned: 'brief', briefed: 'brief',
   writing: 'writing', 'in progress': 'writing', wip: 'writing', 'in-progress': 'writing',
   written: 'written', done: 'written', complete: 'written', completed: 'written', finished: 'written',
   revising: 'revising', revision: 'revising', revisions: 'revising',
   'needs rev': 'needs_rev', 'needs revision': 'needs_rev', 'needs revisions': 'needs_rev',
+  'awaiting rev review': 'needs_rev', 'awaiting revision review': 'needs_rev',
   notes: 'needs_rev', 'needs notes': 'needs_rev',
   sent: 'sent', submitted: 'sent', 'delivered to label': 'sent',
   approved: 'approved', accepted: 'approved',
   delivered: 'delivered',
-  hold: 'hold', 'on hold': 'hold',
+  hold: 'hold', 'on hold': 'hold', holding: 'hold',
   rejected: 'rejected', passed: 'rejected', declined: 'rejected', 'no thanks': 'rejected',
 };
 
 export function fuzzyMatchStatus(raw: string): StatusId {
-  const key = raw.trim().toLowerCase();
-  return STATUS_MAP[key] ?? 'brief';
+  // Strip leading numeric prefix and trailing punctuation
+  const stripped = raw.trim()
+    .replace(/^\d+\s*[-–.\)]\s*/, '')
+    .replace(/[:.;,]+$/, '');
+  const key = stripped.toLowerCase();
+
+  if (STATUS_MAP[key]) return STATUS_MAP[key];
+
+  // Contains fallback: "Sent to client", "On Hold (pending)", etc.
+  // Prefer the longest matching key to avoid short keys shadowing longer ones.
+  let best: StatusId | null = null;
+  let bestLen = 0;
+  for (const [mapKey, statusId] of Object.entries(STATUS_MAP)) {
+    if (key.includes(mapKey) && mapKey.length > bestLen) {
+      best = statusId;
+      bestLen = mapKey.length;
+    }
+  }
+  return best ?? 'brief';
 }
 
 function parseDate(raw: string | undefined): string | null {
