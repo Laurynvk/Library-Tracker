@@ -26,6 +26,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterInvoice, setFilterInvoice] = useState('all');
+  const [filterPublisher, setFilterPublisher] = useState('all');
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [inboxPendingCount, setInboxPendingCount] = useState(0);
@@ -71,8 +72,28 @@ export default function App() {
     }
     if (filterStatus !== 'all') list = list.filter((t) => t.status === filterStatus);
     if (filterInvoice !== 'all') list = list.filter((t) => t.invoice === filterInvoice);
+    if (filterPublisher !== 'all') {
+      if (filterPublisher === '__none__') {
+        list = list.filter((t) => !t.publisher || !t.publisher.trim());
+      } else {
+        list = list.filter((t) => (t.publisher ?? '') === filterPublisher);
+      }
+    }
     return list;
-  }, [tracks, search, filterStatus, filterInvoice]);
+  }, [tracks, search, filterStatus, filterInvoice, filterPublisher]);
+
+  const publisherOptions = useMemo(() => {
+    const set = new Set<string>();
+    let hasEmpty = false;
+    for (const t of tracks) {
+      const p = (t.publisher ?? '').trim();
+      if (p) set.add(p);
+      else hasEmpty = true;
+    }
+    const sorted = Array.from(set).sort((a, b) => a.localeCompare(b));
+    if (hasEmpty) sorted.push('__none__');
+    return sorted;
+  }, [tracks]);
 
   function handleSelectTrack(track: Track) {
     setSelectedTrack(track);
@@ -182,6 +203,9 @@ export default function App() {
           onFilterStatus={setFilterStatus}
           filterInvoice={filterInvoice}
           onFilterInvoice={setFilterInvoice}
+          filterPublisher={filterPublisher}
+          onFilterPublisher={setFilterPublisher}
+          publishers={publisherOptions}
           inboxPendingCount={inboxPendingCount}
           onInboxOpen={() => setInboxOpen(true)}
           onNewFromBrief={() => setBriefOpen(true)}

@@ -8,6 +8,9 @@ type Props = {
   onFilterStatus: (v: string) => void;
   filterInvoice: string;
   onFilterInvoice: (v: string) => void;
+  filterPublisher: string;
+  onFilterPublisher: (v: string) => void;
+  publishers: string[];
   inboxPendingCount: number;
   onInboxOpen: () => void;
   onNewFromBrief: () => void;
@@ -22,6 +25,9 @@ export function Toolbar({
   onFilterStatus,
   filterInvoice,
   onFilterInvoice,
+  filterPublisher,
+  onFilterPublisher,
+  publishers,
   inboxPendingCount,
   onInboxOpen,
   onNewFromBrief,
@@ -174,6 +180,13 @@ export function Toolbar({
           <option value="all">All statuses</option>
           {STATUSES.map((s) => (
             <option key={s.id} value={s.id}>{s.label}</option>
+          ))}
+        </select>
+
+        <select value={filterPublisher} onChange={(e) => onFilterPublisher(e.target.value)} style={selectStyle}>
+          <option value="all">All publishers</option>
+          {publishers.map((p) => (
+            <option key={p} value={p}>{p === '__none__' ? '(No publisher)' : p}</option>
           ))}
         </select>
 
