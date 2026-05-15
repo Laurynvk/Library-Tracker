@@ -11,6 +11,7 @@ import {
   createTitleFolderUnder,
   isFileSystemAccessSupported,
   resolveTrackParentHandle,
+  revealTrackFolder,
 } from '../../lib/folderCreation';
 
 type Props = {
@@ -134,6 +135,8 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
     segments: string[];
   } | null>(null);
   const [creatingTitleFolder, setCreatingTitleFolder] = useState(false);
+  const [revealMessage, setRevealMessage] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState(false);
 
   const INPUT_STYLE: CSSProperties = {
     width: '100%',
@@ -226,6 +229,31 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;
       setError((e as Error).message);
+    }
+  }
+
+  async function handleRevealFolder() {
+    if (!draft) return;
+    setRevealMessage(null);
+    const albumFolder = draft.folder_path;
+    const title = draft.title.trim();
+    if (!albumFolder || !title) {
+      setRevealMessage('No local folder is associated with this track yet.');
+      return;
+    }
+    if (!isFileSystemAccessSupported()) {
+      setRevealMessage(
+        `Open folder requires Chrome/Edge with File System Access. Path: ${albumFolder}/Tracks/${title}`,
+      );
+      return;
+    }
+    setRevealing(true);
+    try {
+      await revealTrackFolder(albumFolder, title);
+    } catch (e) {
+      setRevealMessage((e as Error).message);
+    } finally {
+      setRevealing(false);
     }
   }
 
@@ -490,46 +518,78 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
             />
           </DrawerField>
 
-          {/* Local Folder — read-only */}
+          {/* Local Folder */}
           <DrawerField label="Local Folder">
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '7px 9px',
-              background: THEME.surfaceAlt,
-              border: `1px solid ${THEME.border}`,
-              borderRadius: 4,
-            }}>
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke={THEME.inkSoft} strokeWidth="1.4">
-                <path d="M1 3.5C1 2.67 1.67 2 2.5 2H5l1.5 1.5h5C12.33 3.5 13 4.17 13 5v6c0 .83-.67 1.5-1.5 1.5h-9C1.67 12.5 1 11.83 1 11V3.5z" />
-              </svg>
-              <span style={{
-                fontFamily: THEME.mono,
-                fontSize: 10.5,
-                color: THEME.inkSoft,
-                flex: 1,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}>
-                {draft.folder_path ?? '—'}
-              </span>
-              <button
-                disabled
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: THEME.inkMuted,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: 'default',
-                  fontFamily: THEME.sans,
-                }}
-              >
-                Open
-              </button>
-            </div>
+            {(() => {
+              const albumFolder = draft.folder_path;
+              const title = draft.title.trim();
+              const displayPath = albumFolder && title
+                ? `${albumFolder}/Tracks/${title}`
+                : albumFolder ?? '—';
+              const canReveal = Boolean(albumFolder && title) && !revealing;
+              return (
+                <>
+                  <div
+                    onClick={canReveal ? handleRevealFolder : undefined}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '7px 9px',
+                      background: THEME.surfaceAlt,
+                      border: `1px solid ${THEME.border}`,
+                      borderRadius: 4,
+                      cursor: canReveal ? 'pointer' : 'default',
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke={THEME.inkSoft} strokeWidth="1.4">
+                      <path d="M1 3.5C1 2.67 1.67 2 2.5 2H5l1.5 1.5h5C12.33 3.5 13 4.17 13 5v6c0 .83-.67 1.5-1.5 1.5h-9C1.67 12.5 1 11.83 1 11V3.5z" />
+                    </svg>
+                    <span style={{
+                      fontFamily: THEME.mono,
+                      fontSize: 10.5,
+                      color: THEME.inkSoft,
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {displayPath}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (canReveal) handleRevealFolder();
+                      }}
+                      disabled={!canReveal}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: canReveal ? THEME.accent : THEME.inkMuted,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: canReveal ? 'pointer' : 'default',
+                        fontFamily: THEME.sans,
+                        padding: 0,
+                      }}
+                    >
+                      {revealing ? 'Opening…' : 'Open'}
+                    </button>
+                  </div>
+                  {revealMessage && (
+                    <div style={{
+                      marginTop: 6,
+                      fontSize: 11,
+                      color: THEME.inkMuted,
+                      fontFamily: THEME.sans,
+                      lineHeight: 1.4,
+                    }}>
+                      {revealMessage}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </DrawerField>
 
           {/* Activity feed */}

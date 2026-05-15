@@ -214,6 +214,53 @@ export async function resolveTrackParentHandle(
 }
 
 /**
+ * Walks the saved root handle down to `<album>/Tracks/<title>` and asks the
+ * browser to surface the OS file picker rooted at that folder. The browser
+ * sandbox forbids actually opening Finder/Explorer from JS — this is the
+ * closest the web platform allows: the user sees the system directory dialog
+ * scoped to the requested folder.
+ *
+ * Throws if the File System Access API is unavailable, no root handle is
+ * saved/permitted, or any of the path segments is missing. The caller is
+ * expected to catch these and surface an honest inline message.
+ */
+export async function revealTrackFolder(albumName: string, title: string): Promise<void> {
+  if (!isFileSystemAccessSupported()) {
+    throw new Error('File System Access API not supported in this browser.');
+  }
+  const root = await _folderCreationInternals.loadDirectoryHandle().catch(() => null);
+  if (!root) {
+    throw new Error('No saved root folder. Pick a folder first via the brief modal.');
+  }
+  const ok = await _folderCreationInternals.verifyPermission(root).catch(() => false);
+  if (!ok) {
+    throw new Error('Permission denied for the saved root folder.');
+  }
+
+  let cursor: FileSystemDirectoryHandle;
+  try {
+    const albumDir = await root.getDirectoryHandle(albumName, { create: false });
+    const tracksDir = await albumDir.getDirectoryHandle('Tracks', { create: false });
+    cursor = await tracksDir.getDirectoryHandle(title, { create: false });
+  } catch {
+    throw new Error(`Folder not found on disk: ${albumName}/Tracks/${title}`);
+  }
+
+  const picker = (window as unknown as {
+    showDirectoryPicker?: (opts: object) => Promise<FileSystemDirectoryHandle>;
+  }).showDirectoryPicker;
+  if (typeof picker !== 'function') {
+    throw new Error('File System Access API not supported in this browser.');
+  }
+  try {
+    await picker({ startIn: cursor, mode: 'readwrite' });
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') return;
+    throw e;
+  }
+}
+
+/**
  * Generates a zip file containing the empty folder structure and triggers a download.
  * JSZip requires a placeholder file inside each folder to preserve empty directories.
  */
