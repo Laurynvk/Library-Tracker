@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 
-import { saveDirectoryHandle, loadDirectoryHandle, verifyPermission, createFoldersOnDesktop, _folderCreationInternals, type FolderSpec } from './folderCreation';
+import { saveDirectoryHandle, loadDirectoryHandle, clearDirectoryHandle, verifyPermission, createFoldersOnDesktop, _folderCreationInternals, type FolderSpec } from './folderCreation';
 
 // Builds a fake FileSystemDirectoryHandle that records all directories created
 // beneath it via getDirectoryHandle. Used to assert folder structure was
@@ -51,6 +51,18 @@ describe('directory handle persistence', () => {
     await saveDirectoryHandle(makeHandle('Second'));
     const loaded = await loadDirectoryHandle();
     expect(loaded?.name).toBe('Second');
+  });
+
+  it('clears the stored handle so subsequent loads return null', async () => {
+    await saveDirectoryHandle(makeHandle('ToRemove'));
+    expect((await loadDirectoryHandle())?.name).toBe('ToRemove');
+    await clearDirectoryHandle();
+    expect(await loadDirectoryHandle()).toBeNull();
+  });
+
+  it('clearing when no handle is stored is a no-op', async () => {
+    await expect(clearDirectoryHandle()).resolves.toBeUndefined();
+    expect(await loadDirectoryHandle()).toBeNull();
   });
 });
 

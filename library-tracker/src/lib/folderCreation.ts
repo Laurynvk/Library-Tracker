@@ -46,6 +46,25 @@ export async function saveDirectoryHandle(handle: FileSystemDirectoryHandle): Pr
 }
 
 /**
+ * Removes any previously saved root directory handle from IndexedDB.
+ * Safe to call when no handle is stored.
+ */
+export async function clearDirectoryHandle(): Promise<void> {
+  const db = await openHandleDB();
+  try {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    await idbRequest(tx.objectStore(IDB_STORE).delete(ROOT_DIR_KEY));
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/**
  * Loads the previously saved root directory handle, or returns null if none exists.
  */
 export async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {

@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
 import { useTheme } from '../../lib/theme';
 import {
   isFileSystemAccessSupported,
   createFoldersOnDesktop,
   createFoldersAsZip,
+  loadDirectoryHandle,
+  clearDirectoryHandle,
   type FolderSpec,
 } from '../../lib/folderCreation';
 
@@ -27,20 +30,43 @@ function FolderIcon({ THEME }: { THEME: ReturnType<typeof useTheme> }) {
 export function FolderBuilder({ albumName, trackTitle, folders, onFoldersChange, onFolderPathSet }: Props) {
   const THEME = useTheme();
   const fsSupported = isFileSystemAccessSupported();
+  const [savedFolderName, setSavedFolderName] = useState<string | null>(null);
   const spec: FolderSpec = {
     albumName: albumName || 'New Album',
     topLevelFolders: folders,
     trackTitle: trackTitle || null,
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    loadDirectoryHandle()
+      .then((h) => {
+        if (!cancelled) setSavedFolderName(h?.name ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setSavedFolderName(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function handleCreateOnDesktop() {
     try {
       const path = await createFoldersOnDesktop(spec);
       if (path) onFolderPathSet(path);
+      // Refresh saved name in case this was a first-time pick.
+      const h = await loadDirectoryHandle().catch(() => null);
+      setSavedFolderName(h?.name ?? null);
     } catch (e) {
       console.error('Folder creation failed:', e);
       alert('Could not create folders. Try downloading as zip instead.');
     }
+  }
+
+  async function handleChangeFolder() {
+    await clearDirectoryHandle().catch(() => undefined);
+    setSavedFolderName(null);
   }
 
   async function handleDownloadZip() {
@@ -130,6 +156,27 @@ export function FolderBuilder({ albumName, trackTitle, folders, onFoldersChange,
       >
         + Add folder
       </button>
+
+      {savedFolderName && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          fontSize: 11, color: THEME.inkMuted,
+        }}>
+          <span>
+            Saving to: <code style={{ fontFamily: THEME.mono, fontSize: 11, color: THEME.inkSoft }}>{savedFolderName}</code>
+          </span>
+          <button
+            onClick={handleChangeFolder}
+            style={{
+              background: 'transparent', border: 'none', padding: 0,
+              color: THEME.inkSoft, textDecoration: 'underline', cursor: 'pointer',
+              fontFamily: THEME.sans, fontSize: 11,
+            }}
+          >
+            Change folder
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8 }}>
         {fsSupported && (
