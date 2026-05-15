@@ -3,6 +3,11 @@ import JSZip from 'jszip';
 const IDB_NAME = 'library-tracker';
 const IDB_STORE = 'handles';
 const ROOT_DIR_KEY = 'rootDir';
+const TRACK_DIR_KEY_PREFIX = 'trackDir:';
+
+function trackDirKey(trackId: string): string {
+  return `${TRACK_DIR_KEY_PREFIX}${trackId}`;
+}
 
 function openHandleDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -73,6 +78,63 @@ export async function loadDirectoryHandle(): Promise<FileSystemDirectoryHandle |
     const tx = db.transaction(IDB_STORE, 'readonly');
     const result = await idbRequest(tx.objectStore(IDB_STORE).get(ROOT_DIR_KEY));
     return (result as FileSystemDirectoryHandle | undefined) ?? null;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Persists a per-track FileSystemDirectoryHandle override. When present, this
+ * overrides the album/Tracks/title walk used by revealTrackFolder for this
+ * specific track. Stored client-side only (per-device).
+ */
+export async function saveTrackFolderHandle(
+  trackId: string,
+  handle: FileSystemDirectoryHandle,
+): Promise<void> {
+  const db = await openHandleDB();
+  try {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    await idbRequest(tx.objectStore(IDB_STORE).put(handle, trackDirKey(trackId)));
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Loads the per-track directory handle override, or returns null if none exists.
+ */
+export async function loadTrackFolderHandle(
+  trackId: string,
+): Promise<FileSystemDirectoryHandle | null> {
+  const db = await openHandleDB();
+  try {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const result = await idbRequest(tx.objectStore(IDB_STORE).get(trackDirKey(trackId)));
+    return (result as FileSystemDirectoryHandle | undefined) ?? null;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Removes any previously saved per-track handle. Safe to call when none stored.
+ */
+export async function clearTrackFolderHandle(trackId: string): Promise<void> {
+  const db = await openHandleDB();
+  try {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    await idbRequest(tx.objectStore(IDB_STORE).delete(trackDirKey(trackId)));
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
   } finally {
     db.close();
   }
@@ -224,26 +286,47 @@ export async function resolveTrackParentHandle(
  * saved/permitted, or any of the path segments is missing. The caller is
  * expected to catch these and surface an honest inline message.
  */
-export async function revealTrackFolder(albumName: string, title: string): Promise<void> {
+export async function revealTrackFolder(
+  albumName: string,
+  title: string,
+  trackId?: string,
+): Promise<void> {
   if (!isFileSystemAccessSupported()) {
     throw new Error('File System Access API not supported in this browser.');
   }
-  const root = await _folderCreationInternals.loadDirectoryHandle().catch(() => null);
-  if (!root) {
-    throw new Error('No saved root folder. Pick a folder first via the brief modal.');
-  }
-  const ok = await _folderCreationInternals.verifyPermission(root).catch(() => false);
-  if (!ok) {
-    throw new Error('Permission denied for the saved root folder.');
+
+  let cursor: FileSystemDirectoryHandle | null = null;
+
+  // Prefer a per-track override if one is saved and still permitted.
+  if (trackId) {
+    const override = await loadTrackFolderHandle(trackId).catch(() => null);
+    if (override) {
+      const okOverride = await _folderCreationInternals
+        .verifyPermission(override)
+        .catch(() => false);
+      if (okOverride) {
+        cursor = override;
+      }
+    }
   }
 
-  let cursor: FileSystemDirectoryHandle;
-  try {
-    const albumDir = await root.getDirectoryHandle(albumName, { create: false });
-    const tracksDir = await albumDir.getDirectoryHandle('Tracks', { create: false });
-    cursor = await tracksDir.getDirectoryHandle(title, { create: false });
-  } catch {
-    throw new Error(`Folder not found on disk: ${albumName}/Tracks/${title}`);
+  if (!cursor) {
+    const root = await _folderCreationInternals.loadDirectoryHandle().catch(() => null);
+    if (!root) {
+      throw new Error('No saved root folder. Pick a folder first via the brief modal.');
+    }
+    const ok = await _folderCreationInternals.verifyPermission(root).catch(() => false);
+    if (!ok) {
+      throw new Error('Permission denied for the saved root folder.');
+    }
+
+    try {
+      const albumDir = await root.getDirectoryHandle(albumName, { create: false });
+      const tracksDir = await albumDir.getDirectoryHandle('Tracks', { create: false });
+      cursor = await tracksDir.getDirectoryHandle(title, { create: false });
+    } catch {
+      throw new Error(`Folder not found on disk: ${albumName}/Tracks/${title}`);
+    }
   }
 
   const picker = (window as unknown as {

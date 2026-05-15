@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTheme, STATUSES, INVOICE_STATES } from '../../lib/theme';
 import { updateTrack, deleteTrack } from '../../lib/tracks';
@@ -10,8 +10,10 @@ import { resolveFileNamingForCopy, renderTemplate, type NamingTemplates } from '
 import {
   createTitleFolderUnder,
   isFileSystemAccessSupported,
+  loadTrackFolderHandle,
   resolveTrackParentHandle,
   revealTrackFolder,
+  saveTrackFolderHandle,
 } from '../../lib/folderCreation';
 
 type Props = {
@@ -137,6 +139,11 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
   const [creatingTitleFolder, setCreatingTitleFolder] = useState(false);
   const [revealMessage, setRevealMessage] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
+  const [folderOverride, setFolderOverride] = useState<{ trackId: string; name: string } | null>(null);
+  const [changingFolder, setChangingFolder] = useState(false);
+  const folderOverrideName = folderOverride && track && folderOverride.trackId === track.id
+    ? folderOverride.name
+    : null;
 
   const INPUT_STYLE: CSSProperties = {
     width: '100%',
@@ -149,6 +156,19 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
     fontFamily: THEME.sans,
     outline: 'none',
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!track || !isFileSystemAccessSupported()) return () => { cancelled = true; };
+    const trackId = track.id;
+    loadTrackFolderHandle(trackId)
+      .then((h) => {
+        if (cancelled) return;
+        setFolderOverride(h ? { trackId, name: h.name } : null);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [track]);
 
   if (!track || !draft) return null;
 
@@ -249,11 +269,34 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
     }
     setRevealing(true);
     try {
-      await revealTrackFolder(albumFolder, title);
+      await revealTrackFolder(albumFolder, title, track?.id);
     } catch (e) {
       setRevealMessage((e as Error).message);
     } finally {
       setRevealing(false);
+    }
+  }
+
+  async function handleChangeFolder() {
+    if (!track) return;
+    setRevealMessage(null);
+    if (!isFileSystemAccessSupported()) {
+      setRevealMessage('Change folder requires Chrome/Edge with File System Access.');
+      return;
+    }
+    setChangingFolder(true);
+    try {
+      const picker = (window as unknown as {
+        showDirectoryPicker: (opts: object) => Promise<FileSystemDirectoryHandle>;
+      }).showDirectoryPicker;
+      const picked = await picker({ mode: 'readwrite' });
+      await saveTrackFolderHandle(track.id, picked);
+      setFolderOverride({ trackId: track.id, name: picked.name });
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return;
+      setRevealMessage((e as Error).message);
+    } finally {
+      setChangingFolder(false);
     }
   }
 
@@ -519,14 +562,46 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
           </DrawerField>
 
           {/* Local Folder */}
-          <DrawerField label="Local Folder">
+          <DrawerField
+            label="Local Folder"
+            accessory={
+              <button
+                onClick={handleChangeFolder}
+                disabled={changingFolder || !isFileSystemAccessSupported()}
+                title={
+                  isFileSystemAccessSupported()
+                    ? 'Pick a different folder for this track'
+                    : 'Requires Chrome/Edge with File System Access'
+                }
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: isFileSystemAccessSupported() && !changingFolder
+                    ? THEME.accent
+                    : THEME.inkMuted,
+                  cursor: isFileSystemAccessSupported() && !changingFolder
+                    ? 'pointer'
+                    : 'default',
+                  fontFamily: THEME.sans,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.6,
+                }}
+              >
+                {changingFolder ? 'Changing…' : 'Change'}
+              </button>
+            }
+          >
             {(() => {
               const albumFolder = draft.folder_path;
               const title = draft.title.trim();
-              const displayPath = albumFolder && title
+              const defaultPath = albumFolder && title
                 ? `${albumFolder}/Tracks/${title}`
                 : albumFolder ?? '—';
-              const canReveal = Boolean(albumFolder && title) && !revealing;
+              const displayPath = folderOverrideName ?? defaultPath;
+              const canReveal = (Boolean(folderOverrideName) || Boolean(albumFolder && title)) && !revealing;
               return (
                 <>
                   <div
