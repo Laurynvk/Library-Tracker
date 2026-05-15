@@ -38,6 +38,7 @@ export function FolderBuilder({ albumName, trackTitle, folders, onFoldersChange,
   };
 
   useEffect(() => {
+    if (!fsSupported) return;
     let cancelled = false;
     loadDirectoryHandle()
       .then((h) => {
@@ -49,7 +50,7 @@ export function FolderBuilder({ albumName, trackTitle, folders, onFoldersChange,
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fsSupported]);
 
   async function handleCreateOnDesktop() {
     try {
@@ -157,7 +158,7 @@ export function FolderBuilder({ albumName, trackTitle, folders, onFoldersChange,
         + Add folder
       </button>
 
-      {savedFolderName && (
+      {fsSupported && savedFolderName && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           fontSize: 11, color: THEME.inkMuted,
@@ -204,6 +205,11 @@ export function FolderBuilder({ albumName, trackTitle, folders, onFoldersChange,
           ⬇ Download as Zip
         </button>
       </div>
+      {!fsSupported && (
+        <div style={{ fontSize: 11, color: THEME.inkMuted, fontFamily: THEME.sans }}>
+          Use Chrome for automatic folder creation
+        </div>
+      )}
     </div>
   );
 }
