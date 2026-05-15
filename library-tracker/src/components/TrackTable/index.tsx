@@ -4,10 +4,11 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
+  type SortingFn,
   type SortingState,
 } from '@tanstack/react-table';
 import { useState, useRef, useMemo } from 'react';
-import { useTheme, fmtMoney, fmtDate } from '../../lib/theme';
+import { useTheme, fmtMoney, fmtDate, STATUSES } from '../../lib/theme';
 import type { Track, InvoiceStatus } from '../../types/track';
 import { StatusPill } from './StatusPill';
 import { InvoiceBadge } from './InvoiceBadge';
@@ -247,6 +248,31 @@ function normalizeVersion(raw: string, defaultVersion?: string): string {
 
 const col = createColumnHelper<Track>();
 
+// Sort statuses by the order they appear in STATUSES (workflow order),
+// not alphabetically. Unknown statuses sort to the end.
+const STATUS_ORDER: Record<string, number> = STATUSES.reduce(
+  (acc, s, idx) => { acc[s.id] = idx; return acc; },
+  {} as Record<string, number>,
+);
+const statusSortingFn: SortingFn<Track> = (a, b) => {
+  const ai = STATUS_ORDER[a.original.status] ?? Number.MAX_SAFE_INTEGER;
+  const bi = STATUS_ORDER[b.original.status] ?? Number.MAX_SAFE_INTEGER;
+  return ai - bi;
+};
+
+// Date sort that parses ISO strings. Missing/invalid dates sort as
+// -Infinity so they appear at the bottom under the default desc click.
+const dateSortingFn: SortingFn<Track> = (a, b, columnId) => {
+  const av = a.getValue<string | null>(columnId);
+  const bv = b.getValue<string | null>(columnId);
+  const at = av ? Date.parse(av) : NaN;
+  const bt = bv ? Date.parse(bv) : NaN;
+  const an = Number.isNaN(at) ? -Infinity : at;
+  const bn = Number.isNaN(bt) ? -Infinity : bt;
+  if (an === bn) return 0;
+  return an < bn ? -1 : 1;
+};
+
 const COL_WIDTHS: Record<string, string> = {
   code:          '0 0 220px',
   title:         '1 1 140px',
@@ -338,7 +364,8 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
       col.accessor('status', {
         header: 'Status',
         cell: (i) => <StatusPill statusId={i.getValue()} />,
-        enableSorting: false,
+        sortingFn: statusSortingFn,
+        sortDescFirst: false,
       }),
       col.accessor('due_date', {
         header: 'Due',
@@ -347,6 +374,8 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
             {fmtDate(i.getValue())}
           </span>
         ),
+        sortingFn: dateSortingFn,
+        sortDescFirst: true,
       }),
       col.accessor('fee', {
         header: 'Fee',
