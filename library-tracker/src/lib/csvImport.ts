@@ -15,7 +15,8 @@ export type ParsedRow = Omit<NewTrack, 'invoice'> & {
 };
 
 const STATUS_MAP: Record<string, StatusId> = {
-  brief: 'brief', new: 'brief', received: 'brief', commissioned: 'brief', briefed: 'brief',
+  brief: 'brief', new: 'brief', received: 'brief', commissioned: 'brief',
+  briefed: 'briefed',
   writing: 'writing', 'in progress': 'writing', wip: 'writing', 'in-progress': 'writing',
   written: 'written', done: 'written', complete: 'written', completed: 'written', finished: 'written',
   revising: 'revising', revision: 'revising', revisions: 'revising',
@@ -25,7 +26,8 @@ const STATUS_MAP: Record<string, StatusId> = {
   sent: 'sent', submitted: 'sent', 'delivered to label': 'sent',
   approved: 'approved', accepted: 'approved',
   delivered: 'delivered',
-  hold: 'hold', 'on hold': 'hold', holding: 'hold',
+  hold: 'hold', 'on hold': 'hold',
+  holding: 'holding',
   rejected: 'rejected', passed: 'rejected', declined: 'rejected', 'no thanks': 'rejected',
 };
 

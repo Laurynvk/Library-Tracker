@@ -1,5 +1,6 @@
 export type StatusId =
   | 'brief'
+  | 'briefed'
   | 'writing'
   | 'written'
   | 'revising'
@@ -8,6 +9,7 @@ export type StatusId =
   | 'approved'
   | 'delivered'
   | 'hold'
+  | 'holding'
   | 'rejected';
 
 export type InvoiceStatus = 'unpaid' | 'invoiced' | 'paid';

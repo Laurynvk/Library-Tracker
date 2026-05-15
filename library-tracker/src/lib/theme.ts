@@ -56,6 +56,7 @@ export function useTheme(): Theme { return useContext(ThemeContext); }
 
 export const STATUSES = [
   { id: 'brief',     label: 'Brief received', color: '#a89b8a' },
+  { id: 'briefed',   label: 'Briefed',        color: '#9a8f7e' },
   { id: 'writing',   label: 'Writing',        color: '#c9a14a' },
   { id: 'written',   label: 'Written',        color: '#7c8a5c' },
   { id: 'revising',  label: 'Revising',       color: '#b06a3b' },
@@ -64,6 +65,7 @@ export const STATUSES = [
   { id: 'approved',  label: 'Approved',       color: '#3d8a5f' },
   { id: 'delivered', label: 'Delivered',      color: '#2c2a26' },
   { id: 'hold',      label: 'On hold',        color: '#8a8a8a' },
+  { id: 'holding',   label: 'Holding',        color: '#7a7a7a' },
   { id: 'rejected',  label: 'Rejected',       color: '#6e3535' },
 ] as const;
 
