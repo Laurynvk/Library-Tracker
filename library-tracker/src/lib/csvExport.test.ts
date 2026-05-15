@@ -9,7 +9,7 @@ const track: Track = {
   title: 'Summer Drive',
   album: 'Vol 1',
   version: 'v1.00',
-  status: 'sent',
+  status: 'approved',
   invoice: 'unpaid',
   due_date: '2026-06-01',
   publisher: 'APM Music',
@@ -38,7 +38,7 @@ describe('tracksToCSV', () => {
     const csv = tracksToCSV([track]);
     expect(csv).toContain('APM-001');
     expect(csv).toContain('Summer Drive');
-    expect(csv).toContain('sent');
+    expect(csv).toContain('approved');
     expect(csv).toContain('APM Music');
     expect(csv).toContain('500');
   });

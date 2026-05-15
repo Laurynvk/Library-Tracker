@@ -15,7 +15,7 @@ export type ParsedRow = Omit<NewTrack, 'invoice'> & {
 };
 
 const STATUS_MAP: Record<string, StatusId> = {
-  brief: 'brief', new: 'brief', received: 'brief', commissioned: 'brief',
+  brief: 'briefed', 'brief received': 'briefed', new: 'briefed', received: 'briefed', commissioned: 'briefed',
   briefed: 'briefed',
   writing: 'writing', 'in progress': 'writing', wip: 'writing', 'in-progress': 'writing',
   written: 'written', done: 'written', complete: 'written', completed: 'written', finished: 'written',
@@ -23,10 +23,12 @@ const STATUS_MAP: Record<string, StatusId> = {
   'needs rev': 'needs_rev', 'needs revision': 'needs_rev', 'needs revisions': 'needs_rev',
   'awaiting rev review': 'needs_rev', 'awaiting revision review': 'needs_rev',
   notes: 'needs_rev', 'needs notes': 'needs_rev',
-  sent: 'sent', submitted: 'sent', 'delivered to label': 'sent',
+  revised: 'revised',
+  'need to deliver': 'need_to_deliver', 'needs to deliver': 'need_to_deliver',
+  'needs delivery': 'need_to_deliver', 'to deliver': 'need_to_deliver',
   approved: 'approved', accepted: 'approved',
   delivered: 'delivered',
-  hold: 'hold', 'on hold': 'hold',
+  hold: 'holding', 'on hold': 'holding',
   holding: 'holding',
   rejected: 'rejected', passed: 'rejected', declined: 'rejected', 'no thanks': 'rejected',
 };
@@ -50,7 +52,7 @@ export function fuzzyMatchStatus(raw: string): StatusId {
       bestLen = mapKey.length;
     }
   }
-  return best ?? 'brief';
+  return best ?? 'briefed';
 }
 
 function parseDate(raw: string | undefined): string | null {

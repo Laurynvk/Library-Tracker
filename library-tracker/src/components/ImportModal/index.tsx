@@ -337,7 +337,7 @@ export function ImportModal({ onClose, onImported }: Props) {
                   borderRadius: 6, padding: '8px 12px',
                   fontSize: 12, color: '#92400e', marginBottom: 12,
                 }}>
-                  ⚠ {warningCount} tracks had unrecognised status values — they'll be imported as "brief"
+                  ⚠ {warningCount} tracks had unrecognised status values — they'll be imported as "briefed"
                 </div>
               )}
 

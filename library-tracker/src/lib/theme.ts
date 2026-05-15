@@ -55,18 +55,17 @@ export const ThemeContext = createContext<Theme>(THEME);
 export function useTheme(): Theme { return useContext(ThemeContext); }
 
 export const STATUSES = [
-  { id: 'brief',     label: 'Brief received', color: '#a89b8a' },
-  { id: 'briefed',   label: 'Briefed',        color: '#9a8f7e' },
-  { id: 'writing',   label: 'Writing',        color: '#c9a14a' },
-  { id: 'written',   label: 'Written',        color: '#7c8a5c' },
-  { id: 'revising',  label: 'Revising',       color: '#b06a3b' },
-  { id: 'needs_rev', label: 'Needs revision', color: '#c44545' },
-  { id: 'sent',      label: 'Demo sent',      color: '#5a7fb0' },
-  { id: 'approved',  label: 'Approved',       color: '#3d8a5f' },
-  { id: 'delivered', label: 'Delivered',      color: '#2c2a26' },
-  { id: 'hold',      label: 'On hold',        color: '#8a8a8a' },
-  { id: 'holding',   label: 'Holding',        color: '#7a7a7a' },
-  { id: 'rejected',  label: 'Rejected',       color: '#6e3535' },
+  { id: 'briefed',          label: 'Briefed',         color: '#9a8f7e' },
+  { id: 'writing',          label: 'Writing',         color: '#c9a14a' },
+  { id: 'written',          label: 'Written',         color: '#7c8a5c' },
+  { id: 'revising',         label: 'Revising',        color: '#b06a3b' },
+  { id: 'needs_rev',        label: 'Needs revision',  color: '#c44545' },
+  { id: 'revised',          label: 'Revised',         color: '#6a8a7c' },
+  { id: 'need_to_deliver',  label: 'Need to deliver', color: '#d18b3a' },
+  { id: 'approved',         label: 'Approved',        color: '#3d8a5f' },
+  { id: 'delivered',        label: 'Delivered',       color: '#2c2a26' },
+  { id: 'holding',          label: 'Holding',         color: '#7a7a7a' },
+  { id: 'rejected',         label: 'Rejected',        color: '#6e3535' },
 ] as const;
 
 export const INVOICE_STATES = [

@@ -9,19 +9,22 @@ import {
 
 describe('fuzzyMatchStatus', () => {
   it('maps known values', () => {
-    expect(fuzzyMatchStatus('sent')).toBe('sent');
-    expect(fuzzyMatchStatus('SENT')).toBe('sent');
-    expect(fuzzyMatchStatus('Submitted')).toBe('sent');
+    expect(fuzzyMatchStatus('briefed')).toBe('briefed');
+    expect(fuzzyMatchStatus('BRIEFED')).toBe('briefed');
+    expect(fuzzyMatchStatus('Brief received')).toBe('briefed');
     expect(fuzzyMatchStatus('in progress')).toBe('writing');
     expect(fuzzyMatchStatus('WIP')).toBe('writing');
-    expect(fuzzyMatchStatus('on hold')).toBe('hold');
+    expect(fuzzyMatchStatus('on hold')).toBe('holding');
     expect(fuzzyMatchStatus('passed')).toBe('rejected');
     expect(fuzzyMatchStatus('needs rev')).toBe('needs_rev');
+    expect(fuzzyMatchStatus('Revised')).toBe('revised');
+    expect(fuzzyMatchStatus('Need to deliver')).toBe('need_to_deliver');
+    expect(fuzzyMatchStatus('needs to deliver')).toBe('need_to_deliver');
   });
 
-  it('defaults unknown values to brief', () => {
-    expect(fuzzyMatchStatus('some random thing')).toBe('brief');
-    expect(fuzzyMatchStatus('')).toBe('brief');
+  it('defaults unknown values to briefed', () => {
+    expect(fuzzyMatchStatus('some random thing')).toBe('briefed');
+    expect(fuzzyMatchStatus('')).toBe('briefed');
   });
 });
 
@@ -31,7 +34,7 @@ describe('mapRow', () => {
       TITLE: 'Summer Drive',
       VERS: 'v1.00',
       'PROJECT CODE': 'APM-001',
-      STATUS: 'sent',
+      STATUS: 'approved',
       'DATE DUE': '2026-06-01',
       'ALBUM / ORDER': 'Album A',
       LABEL: 'APM Music',
@@ -44,7 +47,7 @@ describe('mapRow', () => {
     expect(row!.title).toBe('Summer Drive');
     expect(row!.version).toBe('v1.00');
     expect(row!.code).toBe('APM-001');
-    expect(row!.status).toBe('sent');
+    expect(row!.status).toBe('approved');
     expect(row!.album).toBe('Album A');
     expect(row!.publisher).toBe('APM Music');
     expect(row!.collaborators).toEqual(['LK', 'JB']);
@@ -81,7 +84,7 @@ describe('mapRow', () => {
 
 describe('applyFilter', () => {
   const rows = [
-    { title: 'A', _comp_int: 'LK', publisher: 'APM', status: 'sent', album: 'Vol1' },
+    { title: 'A', _comp_int: 'LK', publisher: 'APM', status: 'approved', album: 'Vol1' },
     { title: 'B', _comp_int: 'JB', publisher: 'Extreme', status: 'writing', album: 'Vol2' },
     { title: 'C', _comp_int: 'LK', publisher: 'APM', status: 'delivered', album: 'Vol1' },
   ] as Parameters<typeof applyFilter>[0];
@@ -98,7 +101,7 @@ describe('applyFilter', () => {
   });
 
   it('filters by status', () => {
-    const result = applyFilter(rows, { type: 'status', value: 'sent' });
+    const result = applyFilter(rows, { type: 'status', value: 'approved' });
     expect(result).toHaveLength(1);
   });
 
@@ -114,7 +117,7 @@ describe('applyFilter', () => {
 
 describe('getFilterValues', () => {
   const rows = [
-    { _comp_int: 'LK', publisher: 'APM', status: 'sent', album: 'Vol1' },
+    { _comp_int: 'LK', publisher: 'APM', status: 'approved', album: 'Vol1' },
     { _comp_int: 'JB', publisher: 'Extreme', status: 'writing', album: 'Vol1' },
     { _comp_int: 'LK', publisher: 'APM', status: 'delivered', album: 'Vol2' },
   ] as Parameters<typeof getFilterValues>[0];
@@ -123,53 +126,53 @@ describe('getFilterValues', () => {
     const vals = getFilterValues(rows);
     expect(vals.initials).toEqual(['JB', 'LK']);
     expect(vals.label).toEqual(['APM', 'Extreme']);
-    expect(vals.status).toEqual(['delivered', 'sent', 'writing']);
+    expect(vals.status).toEqual(['approved', 'delivered', 'writing']);
     expect(vals.album).toEqual(['Vol1', 'Vol2']);
   });
 });
 
 describe('parseCSVText', () => {
   it('parses a CSV string into rows', () => {
-    const csv = `TITLE,STATUS,COMP INT\nSummer Drive,sent,LK\nCity Pulse,writing,JB`;
+    const csv = `TITLE,STATUS,COMP INT\nSummer Drive,approved,LK\nCity Pulse,writing,JB`;
     const { rows } = parseCSVText(csv);
     expect(rows).toHaveLength(2);
     expect(rows[0].title).toBe('Summer Drive');
-    expect(rows[0].status).toBe('sent');
+    expect(rows[0].status).toBe('approved');
   });
 
   it('skips rows without a title', () => {
-    const csv = `TITLE,STATUS\nSummer Drive,sent\n,writing`;
+    const csv = `TITLE,STATUS\nSummer Drive,approved\n,writing`;
     const { rows } = parseCSVText(csv);
     expect(rows).toHaveLength(1);
   });
 
   it('counts unrecognised status values', () => {
-    const csv = `TITLE,STATUS\nTrack A,sent\nTrack B,some weird status\nTrack C,another unknown`;
+    const csv = `TITLE,STATUS\nTrack A,approved\nTrack B,some weird status\nTrack C,another unknown`;
     const { rows, defaultedCount } = parseCSVText(csv);
     expect(rows).toHaveLength(3);
     expect(defaultedCount).toBe(2);
-    expect(rows[1].status).toBe('brief'); // defaulted
+    expect(rows[1].status).toBe('briefed'); // defaulted
   });
 
   it('returns 0 defaultedCount when all statuses are recognised', () => {
-    const csv = `TITLE,STATUS\nTrack A,sent\nTrack B,writing`;
+    const csv = `TITLE,STATUS\nTrack A,approved\nTrack B,writing`;
     const { defaultedCount } = parseCSVText(csv);
     expect(defaultedCount).toBe(0);
   });
 
   it('strips a leading UTF-8 BOM so the first header still matches', () => {
     const BOM = String.fromCharCode(0xfeff);
-    const csv = `${BOM}TITLE,STATUS\nSummer Drive,sent`;
+    const csv = `${BOM}TITLE,STATUS\nSummer Drive,approved`;
     const { rows } = parseCSVText(csv);
     expect(rows).toHaveLength(1);
     expect(rows[0].title).toBe('Summer Drive');
-    expect(rows[0].status).toBe('sent');
+    expect(rows[0].status).toBe('approved');
   });
 
   it('accepts the app\'s own export headers (Publisher, Due Date, Version, Code, Album)', () => {
     const csv = [
       'Code,Title,Version,Album,Publisher,Status,Invoice,Fee,Due Date,Notes,Collaborators,Created At',
-      'APM-001,Summer Drive,v1.02,Volume A,APM Music,sent,unpaid,,2026-06-01,some notes,LK;JB,2026-05-01',
+      'APM-001,Summer Drive,v1.02,Volume A,APM Music,approved,unpaid,,2026-06-01,some notes,LK;JB,2026-05-01',
     ].join('\n');
     const { rows } = parseCSVText(csv);
     expect(rows).toHaveLength(1);

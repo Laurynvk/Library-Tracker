@@ -144,7 +144,7 @@ export function BriefModal({ onClose, onCreated }: Props) {
         fee: parseFeeToNumber(values.fee),
         file_naming: values.file_naming || null,
         title: values.title || '',
-        status: 'brief',
+        status: 'briefed',
         invoice: 'unpaid',
         brief_link: null,
         folder_path: resolvedPath,

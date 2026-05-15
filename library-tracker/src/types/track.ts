@@ -1,14 +1,13 @@
 export type StatusId =
-  | 'brief'
   | 'briefed'
   | 'writing'
   | 'written'
   | 'revising'
   | 'needs_rev'
-  | 'sent'
+  | 'revised'
+  | 'need_to_deliver'
   | 'approved'
   | 'delivered'
-  | 'hold'
   | 'holding'
   | 'rejected';
 
