@@ -58,9 +58,27 @@ export function ImportModal({ onClose, onImported }: Props) {
     reader.readAsText(file);
   }, []);
 
+  const onDropRejected = useCallback((rejections: { file: File }[]) => {
+    // Fallback: react-dropzone may reject a CSV whose browser MIME type
+    // isn't recognised (Excel exports often report application/vnd.ms-excel
+    // or empty string). If the file has a .csv extension, accept it anyway.
+    const file = rejections[0]?.file;
+    if (file && /\.csv$/i.test(file.name)) {
+      onDrop([file]);
+    } else if (file) {
+      setError('Unsupported file type. Please upload a .csv file.');
+    }
+  }, [onDrop]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'text/csv': ['.csv'] },
+    onDropRejected,
+    accept: {
+      'text/csv': ['.csv'],
+      'application/vnd.ms-excel': ['.csv'],
+      'application/csv': ['.csv'],
+      'text/plain': ['.csv'],
+    },
     multiple: false,
   });
 
