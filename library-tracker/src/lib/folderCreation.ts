@@ -164,6 +164,56 @@ export async function createFoldersOnDesktop(spec: FolderSpec): Promise<string |
 }
 
 /**
+ * Creates a single named subfolder beneath the given parent directory handle.
+ * Used when a track gains a title after its enclosing folders were already
+ * created — we add `parent/title/` without disturbing siblings.
+ */
+export async function createTitleFolderUnder(
+  parentHandle: FileSystemDirectoryHandle,
+  title: string,
+): Promise<void> {
+  await parentHandle.getDirectoryHandle(title, { create: true });
+}
+
+/**
+ * Walks down from the saved root handle into `<album>/Tracks` if present.
+ * Returns the deepest existing handle (the "track folder") plus the path
+ * segments traversed, so callers can render a human-readable suggested path.
+ * Returns null if File System Access isn't available or no root handle is saved.
+ */
+export async function resolveTrackParentHandle(
+  albumFolder: string | null,
+): Promise<{ parent: FileSystemDirectoryHandle; segments: string[] } | null> {
+  if (!isFileSystemAccessSupported()) return null;
+  const root = await _folderCreationInternals.loadDirectoryHandle().catch(() => null);
+  if (!root) return null;
+  const ok = await _folderCreationInternals.verifyPermission(root).catch(() => false);
+  if (!ok) return null;
+
+  const segments: string[] = [root.name];
+  let cursor: FileSystemDirectoryHandle = root;
+
+  if (albumFolder) {
+    try {
+      const albumDir = await cursor.getDirectoryHandle(albumFolder, { create: false });
+      cursor = albumDir;
+      segments.push(albumFolder);
+      try {
+        const tracksDir = await cursor.getDirectoryHandle('Tracks', { create: false });
+        cursor = tracksDir;
+        segments.push('Tracks');
+      } catch {
+        // No Tracks subfolder yet — title folder will land directly under the album.
+      }
+    } catch {
+      // Album folder doesn't exist — fall back to creating under the root.
+    }
+  }
+
+  return { parent: cursor, segments };
+}
+
+/**
  * Generates a zip file containing the empty folder structure and triggers a download.
  * JSZip requires a placeholder file inside each folder to preserve empty directories.
  */

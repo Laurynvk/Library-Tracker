@@ -7,6 +7,11 @@ import { ActivityFeed } from './ActivityFeed';
 import { DrawerField } from './DrawerField';
 import { CopyIconButton } from '../CopyIconButton';
 import { resolveFileNamingForCopy, renderTemplate, type NamingTemplates } from '../../lib/settings';
+import {
+  createTitleFolderUnder,
+  isFileSystemAccessSupported,
+  resolveTrackParentHandle,
+} from '../../lib/folderCreation';
 
 type Props = {
   track: Track | null;
@@ -123,6 +128,12 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [titleFolderPrompt, setTitleFolderPrompt] = useState<{
+    title: string;
+    parent: FileSystemDirectoryHandle;
+    segments: string[];
+  } | null>(null);
+  const [creatingTitleFolder, setCreatingTitleFolder] = useState(false);
 
   const INPUT_STYLE: CSSProperties = {
     width: '100%',
@@ -159,13 +170,62 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
       });
     setSaving(true);
     setError(null);
+    // Detect that a previously-empty title is now set — we'll offer to create
+    // a matching folder once the save succeeds. Skip silently if the FS Access
+    // API isn't available; the save path itself must not depend on it.
+    const titleWasAdded =
+      track.title.trim() === '' && draft.title.trim() !== '';
+    const newTitle = draft.title.trim();
     try {
       const updated = await updateTrack(track.id, patch);
       onSave(updated);
       setSaving(false);
+      if (titleWasAdded && isFileSystemAccessSupported()) {
+        const resolved = await resolveTrackParentHandle(updated.folder_path).catch(() => null);
+        if (resolved) {
+          setTitleFolderPrompt({
+            title: newTitle,
+            parent: resolved.parent,
+            segments: resolved.segments,
+          });
+        }
+      }
     } catch (e) {
       setError((e as Error).message);
       setSaving(false);
+    }
+  }
+
+  async function handleCreateTitleFolder() {
+    if (!titleFolderPrompt) return;
+    setCreatingTitleFolder(true);
+    setError(null);
+    try {
+      await createTitleFolderUnder(titleFolderPrompt.parent, titleFolderPrompt.title);
+      setTitleFolderPrompt(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCreatingTitleFolder(false);
+    }
+  }
+
+  async function handleChangeTitleFolderPath() {
+    if (!titleFolderPrompt) return;
+    if (!isFileSystemAccessSupported()) return;
+    try {
+      const picker = (window as unknown as {
+        showDirectoryPicker: (opts: object) => Promise<FileSystemDirectoryHandle>;
+      }).showDirectoryPicker;
+      const picked = await picker({ mode: 'readwrite' });
+      setTitleFolderPrompt({
+        title: titleFolderPrompt.title,
+        parent: picked,
+        segments: [picked.name],
+      });
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return;
+      setError((e as Error).message);
     }
   }
 
@@ -611,6 +671,120 @@ export function TrackDrawer({ track, namingTemplates, userInitials, defaultVersi
           )}
         </div>
       </div>
+
+      {titleFolderPrompt && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1100,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            fontFamily: THEME.sans,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 460,
+              background: THEME.surface,
+              borderRadius: 10,
+              boxShadow: '0 24px 80px rgba(0,0,0,0.35)',
+              padding: '18px 20px 16px',
+            }}
+          >
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: THEME.ink,
+              marginBottom: 10,
+              lineHeight: 1.35,
+            }}>
+              Do you want to make a folder with this track title in the track folder?
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 14,
+            }}>
+              <div style={{
+                flex: 1,
+                background: THEME.surfaceAlt,
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 5,
+                padding: '7px 9px',
+                fontFamily: THEME.mono,
+                fontSize: 11,
+                color: THEME.inkSoft,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {[...titleFolderPrompt.segments, titleFolderPrompt.title].join('/')}
+              </div>
+              <button
+                onClick={handleChangeTitleFolderPath}
+                disabled={creatingTitleFolder}
+                style={{
+                  padding: '6px 10px',
+                  background: 'transparent',
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 5,
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  color: THEME.inkSoft,
+                  cursor: creatingTitleFolder ? 'default' : 'pointer',
+                  fontFamily: THEME.sans,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Change path
+              </button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                onClick={() => setTitleFolderPrompt(null)}
+                disabled={creatingTitleFolder}
+                style={{
+                  padding: '7px 16px',
+                  background: 'transparent',
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 5,
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  color: THEME.inkSoft,
+                  cursor: creatingTitleFolder ? 'default' : 'pointer',
+                  fontFamily: THEME.sans,
+                }}
+              >
+                No
+              </button>
+              <button
+                onClick={handleCreateTitleFolder}
+                disabled={creatingTitleFolder}
+                style={{
+                  padding: '7px 18px',
+                  background: THEME.accent,
+                  border: 'none',
+                  borderRadius: 5,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: '#fff',
+                  cursor: creatingTitleFolder ? 'default' : 'pointer',
+                  fontFamily: THEME.sans,
+                  opacity: creatingTitleFolder ? 0.7 : 1,
+                }}
+              >
+                {creatingTitleFolder ? 'Creating…' : 'Yes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
