@@ -4,10 +4,11 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
+  type Column,
   type SortingFn,
   type SortingState,
 } from '@tanstack/react-table';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useTheme, fmtMoney, fmtDate, STATUSES } from '../../lib/theme';
 import type { Track, InvoiceStatus } from '../../types/track';
 import { StatusPill } from './StatusPill';
@@ -296,6 +297,98 @@ declare module '@tanstack/react-table' {
   }
 }
 
+function SortMenu({ column }: { column: Column<Track, unknown> }) {
+  const THEME = useTheme();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const current = column.getIsSorted();
+
+  function select(action: 'asc' | 'desc' | 'clear') {
+    if (action === 'asc') column.toggleSorting(false);
+    else if (action === 'desc') column.toggleSorting(true);
+    else column.clearSorting();
+    setOpen(false);
+  }
+
+  const itemStyle = (active: boolean): React.CSSProperties => ({
+    display: 'block', width: '100%', textAlign: 'left',
+    padding: '6px 10px',
+    fontSize: 11, fontWeight: 500,
+    letterSpacing: 0.3, textTransform: 'none',
+    fontFamily: THEME.sans,
+    color: active ? THEME.accent : THEME.ink,
+    background: 'transparent',
+    border: 'none', cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  });
+
+  return (
+    <span
+      ref={wrapRef}
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        aria-label="Sort options"
+        title="Sort options"
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 16, height: 16,
+          padding: 0, marginLeft: 2,
+          background: 'transparent', border: 'none',
+          color: THEME.inkMuted, cursor: 'pointer',
+          borderRadius: 3,
+          opacity: open ? 1 : 0.7,
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+          <path d="M2 4 L5 1 L8 4 Z" fill="currentColor" opacity={current === 'asc' ? 1 : 0.45} />
+          <path d="M2 6 L5 9 L8 6 Z" fill="currentColor" opacity={current === 'desc' ? 1 : 0.45} />
+        </svg>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute', top: '100%', left: 0,
+            marginTop: 4, zIndex: 10,
+            minWidth: 140,
+            background: THEME.surface,
+            border: `1px solid ${THEME.borderStrong}`,
+            borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            padding: '4px 0',
+          }}
+        >
+          <button type="button" role="menuitem" style={itemStyle(current === 'asc')} onClick={() => select('asc')}>
+            ↑ Sort ascending
+          </button>
+          <button type="button" role="menuitem" style={itemStyle(current === 'desc')} onClick={() => select('desc')}>
+            ↓ Sort descending
+          </button>
+          <button type="button" role="menuitem" style={itemStyle(false)} onClick={() => select('clear')} disabled={!current}>
+            <span style={{ opacity: current ? 1 : 0.4 }}>✕ Clear sort</span>
+          </button>
+        </div>
+      )}
+    </span>
+  );
+}
+
 export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVersion, onUpdateCode, onRowClick, selectedTrackId, userInitials, defaultVersion, namingTemplates, onImportClick, totalTrackCount }: Props) {
   const THEME = useTheme();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -452,6 +545,7 @@ export function TrackTable({ tracks, onUpdateInvoice, onUpdateTitle, onUpdateVer
             {flexRender(header.column.columnDef.header, header.getContext())}
             {header.column.getIsSorted() === 'asc' && <span style={{ opacity: 0.6, fontSize: 9 }}>↑</span>}
             {header.column.getIsSorted() === 'desc' && <span style={{ opacity: 0.6, fontSize: 9 }}>↓</span>}
+            {header.column.getCanSort() && <SortMenu column={header.column} />}
           </div>
         ))}
       </div>
